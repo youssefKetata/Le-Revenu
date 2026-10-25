@@ -4,7 +4,7 @@ Technical assignment: a community forum built with Next.js App Router, React, Ty
 
 ## Current scope
 
-Phases 1 and 2 are complete. Phase 3 adds a Next.js login/logout page and secure Strapi publishing endpoints, verified by HTTP integration tests. The community home is still a placeholder; the feed, discussion screens and publishing forms are phase 4 in the [implementation plan](IMPLEMENTATION_PLAN.md). Browser verification of the login UI is pending.
+Phases 1–4 are implemented: foundation, Strapi data/API, login and secure publishing, and the community feed, filters, sorting, discussion detail and authenticated discussion/reply forms. The HTTP journey and focused rendering tests pass; desktop/mobile browser visual verification remains pending. See the [implementation plan](IMPLEMENTATION_PLAN.md).
 
 ```text
 frontend/                 Next.js application
@@ -179,7 +179,7 @@ The Strapi write endpoints require `Authorization: Bearer <access token>`:
 | `POST /discussions` | `{ "data": { "title": "A title of at least 10 characters", "content": "Discussion content", "type": "question", "category": "<category documentId>" } }` |
 | `POST /discussions/:documentId/replies` | `{ "data": { "content": "Reply content" } }` |
 
-Both return HTTP 201 with `{ data: { ... }, meta: {} }` and the same safe public fields used by reads. The frontend discussion/reply forms and their thin authenticated Next.js transport are phase 4.
+Both return HTTP 201 with `{ data: { ... }, meta: {} }` and the same safe public fields used by reads. The Next.js forms forward the member's access token through Server Actions; Strapi independently enforces authorization and validation.
 
 Strapi trims title/content before validation and storage. Titles must contain 10-255 characters after trimming; discussion content 1-50,000 and reply content 1-10,000. Type must be `question` or `discussion`. Category and discussion relations must identify existing documents. Strapi assigns the author from `ctx.state.user`; any client-supplied author, document identifier, timestamp, relation override or other unexpected field is rejected rather than silently stripped. Query options are not accepted on writes. Content is plain text and will be rendered as text by the forum UI.
 
@@ -209,7 +209,7 @@ npm run start:backend
 npm run start:frontend
 ```
 
-Stop development processes before running production builds. The Strapi database pool is limited to three connections for local development. Production mode avoids keeping development watchers active when only a demonstration is needed. Seed and forum API integration tests are available now; frontend rendering tests will accompany the forum screens.
+Stop development processes before running production builds. The Strapi database pool is limited to three connections for local development. Production mode avoids keeping development watchers active when only a demonstration is needed. For production login, serve Next.js over HTTPS: its production session cookie is deliberately `Secure`.
 
 Use a new terminal for `dev:backend`, or set `$env:NODE_ENV = 'development'` when switching that terminal back to development.
 
@@ -219,7 +219,7 @@ Use a new terminal for `dev:backend`, or set `$env:NODE_ENV = 'development'` whe
 - Frontend environment template: `frontend/.env.example`.
 - Backend database configuration: `backend/config/database.ts`, PostgreSQL only.
 - `STRAPI_URL` is server-side configuration. Never place database credentials or privileged Strapi tokens in `NEXT_PUBLIC_*` variables.
-- The placeholder page uses system fonts so startup/build does not require an external font download. Typography will be refined during the design phase.
+- Playfair Display bold is served locally from `frontend/public/fonts/`, with its Open Font License included. Startup and builds do not download fonts. Body text uses system fonts.
 - Dependencies for the two applications are installed separately, with their own lockfiles; Strapi's admin React version is independent from the Next.js frontend.
 - Strapi content-type schemas will be committed to Git. Its application database tables are initialized through Strapi; no hand-written forum SQL schema is used.
 
@@ -247,7 +247,7 @@ Verified against the configured local PostgreSQL database:
 
 ## Verification
 
-Run the single integration suite with:
+Run the backend integration suite with:
 
 ```powershell
 npm run test:api
@@ -261,7 +261,28 @@ The suite starts real Strapi HTTP endpoints in an isolated PostgreSQL schema and
 - Validation, missing relations, anonymous/forged requests and author-spoofing protection.
 - Expired, blocked, underprivileged and logged-out sessions being unable to publish.
 
-Frontend/backend type checking, frontend lint and both production builds passed for the current application code. Browser login/logout verification is still pending: the retry was denied by a saved browser permission or managed policy for `http://127.0.0.1:3100`.
+With both development servers running and demo data seeded, run two read-only frontend rendering scenarios:
+
+```powershell
+npm run test:frontend
+```
+
+These compare rendered discussions and replies with live Strapi data, verify filtering/order and metadata, and exercise empty/invalid/missing pages and anonymous publishing navigation. They require `http://localhost:3000` and `http://127.0.0.1:1337` by default; override with `TEST_FRONTEND_URL` and `TEST_STRAPI_URL`. No database records are changed.
+
+A separate local HTTP form check also passed Next.js login, native validation feedback, discussion creation, reply publication, reload, content escaping and logout. Its temporary discussion/reply were removed. Frontend TypeScript, lint and the production build pass for phase 4. Browser visual and hydrated interaction checks remain pending: the browser tool still rejected its local test origin. HTTP checks do not establish visual fidelity or client-side draft retention.
+
+## Frontend journey and rendering
+
+- `/` renders live, paginated discussions through Server Components. `category`, `sort` and `page` stay in the URL; filtering/sorting reset to page one. The GET sort form works without client JavaScript.
+- `/discussions/[documentId]` renders the discussion, public author/date/category and paginated replies. Content is rendered as React text with preserved line breaks, never interpreted as HTML. Missing discussions use the not-found page; service failures show a retry state.
+- `/discussions/nouvelle` requires a verified member. Native browser constraints provide immediate feedback; Strapi remains responsible for authoritative validation. Only intended fields are forwarded, and Strapi assigns the author.
+- Successful creation redirects to the new discussion. Reply publication redirects to the final reply page and the new reply's anchor. Both invalidate affected Next.js routes; API reads remain uncached.
+- Controlled forms keep typed text in memory on failed submissions. Expired-session feedback opens login in another tab so the original draft stays open; drafts are not persisted across reloads. Login return destinations are limited to known local forum routes.
+- A shared session-aware header, responsive category navigation, loading/empty/error states and reusable discussion/byline/pagination components preserve the supplied mockup's main visual identity. Unsupported prototype controls are omitted.
+
+Frontend structure is organized by responsibility: `components/ui/` contains shared controls, `components/layout/` contains the site shell, and `components/forum/` contains forum presentation. Route-specific forms stay next to their pages. `lib/forum/` groups API reads, public types and URL helpers; server-only transport and sessions remain in `lib/strapi.ts` and `lib/session.ts`. See [frontend/README.md](frontend/README.md) for the directory map and [frontend/AGENTS.md](frontend/AGENTS.md) for implementation conventions.
+
+Ordinary component styles use Tailwind utilities and shared controls. Global CSS is limited to fonts, design tokens and base element rules. A small colocated CSS Module handles the hero's layered gradient. Expected service failures have explicit feedback; unexpected code errors reach the route error boundary. Backend structure stays within Strapi's native controllers/services/policies conventions, with no extra repository layer or parallel Next.js business backend.
 
 ## Source material
 

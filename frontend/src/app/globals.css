@@ -1,18 +1,52 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f5f5f7;
-  --foreground: #1d1d1f;
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/fonts/playfair-display-bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
+@theme {
+  --color-background: #f5f5f7;
+  --color-foreground: #1d1d1f;
+  --color-brand: #eb0f0f;
+  --color-brand-hover: #cc0d0d;
+  --color-brand-text: #c90909;
+  --color-border: #e5e5ea;
+  --color-muted: #626268;
+  --color-surface-muted: #f2f2f4;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
+  --breakpoint-wide: 68.75rem;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  button:not(:disabled),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+  a,
+  button,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-brand-text);
+    outline-offset: 4px;
+  }
+  [id] {
+    scroll-margin-top: 110px;
+  }
 }

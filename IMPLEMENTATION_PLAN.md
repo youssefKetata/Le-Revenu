@@ -1,6 +1,6 @@
 # Le Revenu technical test: scope and implementation plan
 
-Status: phases 1 and 2 complete; phase 3 login/logout and secure publishing are implemented locally for review. Five focused integration scenarios verify seeding, reads, sessions, publishing, validation and author protection. Next.js has a login page and session-aware placeholder home; browser login/logout verification is pending because a saved browser permission or managed policy still denies the local test origin. Phase 4 adds the forum screens and publishing forms. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432).
+Status: phases 1–4 implemented. Five focused backend scenarios verify seeding, reads, sessions, publishing, validation and author protection. Two frontend HTTP rendering scenarios pass, and a local HTTP form journey passed login → create → reply → reload → logout with temporary records cleaned up. Browser visual/hydration verification remains pending because the browser tool still rejects its local test origin. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432).
 
 ## 1. Source of truth
 
@@ -151,16 +151,17 @@ Completion gate passed: direct HTTP requests return the correct seeded content, 
 - Enforce title/content/type/relation validation and reject author spoofing or unwanted fields. Implemented in Strapi's publishing input parser and services.
 - Add API integration tests using an isolated PostgreSQL test schema. Implemented in `scripts/forum-api.test.mjs`; tests call the actual Strapi HTTP surface, including native login/logout.
 
-API completion gate passed: valid writes persist; invalid, unauthenticated and impersonation attempts fail independently of Next.js. Frontend browser verification remains pending; all phase 3 changes stay local until explicitly approved for push.
+API completion gate passed: valid writes persist; invalid, unauthenticated and impersonation attempts fail independently of Next.js. Phase 3 is committed and pushed as `1bc273c`. The PDF permits demo authentication, so fixed ten-minute sessions remain intentional and token rotation is out of scope.
 
 ### Phase 4: Complete the core Next.js journey
 
-- Implement typed API access, home feed, category filter, date sorting and discussion detail route.
-- Build the new-discussion form and reply form with pending/error/success states.
-- Redirect to the created discussion; refresh replies and counts after publishing.
-- Add loading, empty, not-found and API-error states, plus frontend rendering tests.
+- Implement typed API access, home feed, category filter, date sorting and discussion detail route. Implemented with Server Components and URL-backed filters/sort/pages.
+- Build the new-discussion form and reply form with pending/error/success states. Implemented with controlled Client Components and thin authenticated Server Actions; Strapi retains all business rules.
+- Redirect to the created discussion; refresh replies and counts after publishing. Implemented with route invalidation and a redirect to the final reply page/new reply anchor.
+- Add loading, empty, not-found and API-error states, plus frontend rendering tests. Implemented; two read-only HTTP rendering scenarios pass. Locally bundled typography and responsive layouts follow the reference design.
+- Structure review: forum components and API helpers are grouped by responsibility; shared controls own button/form styling; global CSS contains only fonts, tokens and base rules. Tailwind is used for ordinary component styles, with one small CSS Module for the layered hero background. Normal detail/reply reads run in parallel, and unexpected exceptions reach the error boundary. The native Strapi backend organization is retained.
 
-Completion gate: read -> login -> create -> reply -> reload works through the browser with real PostgreSQL data.
+HTTP journey gate passed against real PostgreSQL data, including native validation and safe text rendering. Browser visual and hydrated interaction checks remain pending; do not mark the browser completion gate passed until verified.
 
 ### Phase 5: Responsive fidelity and delivery verification
 

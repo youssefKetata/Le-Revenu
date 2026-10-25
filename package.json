@@ -9,6 +9,7 @@
     "setup:env": "node scripts/setup-env.mjs",
     "seed:demo": "node scripts/seed-demo.mjs",
     "test:api": "node --test --test-concurrency=1 scripts/forum-api.test.mjs",
+    "test:frontend": "node --test --test-concurrency=1 scripts/frontend.test.mjs",
     "db:check": "node scripts/check-database.mjs",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run develop",

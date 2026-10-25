@@ -1,0 +1,39 @@
+// Public Strapi response shapes and forum form state; no private user fields.
+export type Author = { documentId: string; username: string };
+export type Category = {
+  documentId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+};
+export type DiscussionSummary = {
+  documentId: string;
+  title: string;
+  type: "question" | "discussion";
+  createdAt: string;
+  author: Author | null;
+  category: Omit<Category, "description"> | null;
+  replyCount: number;
+};
+export type Discussion = DiscussionSummary & { content: string };
+export type Reply = {
+  documentId: string;
+  content: string;
+  createdAt: string;
+  author: Author | null;
+};
+export type Pagination = {
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  total: number;
+};
+export type Collection<T> = { data: T[]; meta: { pagination: Pagination } };
+export type Item<T> = { data: T; meta: Record<string, never> };
+export type PublishState = {
+  error: string | null;
+  field?: string;
+  signIn?: boolean;
+};

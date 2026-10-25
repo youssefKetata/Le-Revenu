@@ -1,0 +1,5 @@
+.background {
+  background:
+    radial-gradient(ellipse at top right, #a41927 0%, transparent 65%),
+    linear-gradient(140deg, #333336, #19191c);
+}

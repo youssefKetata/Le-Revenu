@@ -1,39 +1,129 @@
-import Link from "next/link";
-import { logout } from "@/app/actions/auth";
-import { getSession } from "@/lib/session";
+import PageContainer from "@/components/layout/page-container";
+import CategoryNav from "@/components/forum/category-nav";
+import CommunityHero from "@/components/forum/community-hero";
+import CommunitySidebar from "@/components/forum/community-sidebar";
+import DiscussionCard from "@/components/forum/discussion-card";
+import Pagination from "@/components/forum/pagination";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Notice, ServiceError } from "@/components/ui/notice";
+import { getCategories, getDiscussions } from "@/lib/forum/api";
+import { feedHref, readFeedQuery, type SearchParams } from "@/lib/forum/query";
+import { StrapiError } from "@/lib/strapi";
 
-export default async function Home() {
-  const session = await getSession();
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const query = readFeedQuery(await searchParams);
+  if (!query)
+    return (
+      <PageContainer>
+        <Notice title="Filtres invalides">
+          <p>Vérifiez la catégorie, le tri et le numéro de page.</p>
+          <ButtonLink variant="secondary" className="mt-5" href="/">
+            Revenir aux discussions
+          </ButtonLink>
+        </Notice>
+      </PageContainer>
+    );
+  let categories, feed;
+  try {
+    [categories, feed] = await Promise.all([
+      getCategories(),
+      getDiscussions(query),
+    ]);
+  } catch (error) {
+    if (!(error instanceof StrapiError)) throw error;
+    return (
+      <PageContainer>
+        <ServiceError href={feedHref(query)} />
+      </PageContainer>
+    );
+  }
+  const category = categories.find((item) => item.slug === query.category);
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center gap-8 px-6 py-16">
-      <div className="flex flex-wrap items-center gap-4">
-        <span className="inline-flex items-center gap-1 bg-[#eb0f0f] p-1 text-xl font-black tracking-tight text-white">
-          <span className="bg-black px-1">LE</span>
-          <span className="pr-1">REVENU</span>
-        </span>
-        <span className="text-sm font-semibold text-neutral-600">Communauté</span>
-        <div className="ml-auto flex flex-wrap items-center gap-3 text-sm">
-          {session.member && <span>Bonjour, <strong>{session.member.username}</strong></span>}
-          {session.member || session.unavailable ? (
-            <form action={logout}>
-              <button className="rounded-md border border-neutral-300 px-3 py-2 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600">Se déconnecter</button>
-            </form>
-          ) : (
-            <Link href="/connexion" className="rounded-md bg-[#eb0f0f] px-3 py-2 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600">Se connecter</Link>
-          )}
+    <PageContainer
+      width="community"
+      className="grid items-start gap-[18px] md:grid-cols-[180px_minmax(0,1fr)] md:gap-5 wide:grid-cols-[205px_minmax(0,1fr)_265px] wide:gap-[26px]"
+    >
+      <CategoryNav categories={categories} query={query} />
+      <div className="min-w-0 space-y-5">
+        <CommunityHero category={category} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-serif text-xl font-bold">
+            {query.category
+              ? (category?.name ?? "Discussions de cet espace")
+              : "Toutes les discussions"}
+            <span className="ml-2 inline-block rounded-md bg-neutral-200 px-[7px] py-px align-middle font-sans text-[11px]">
+              {feed.meta.pagination.total}
+            </span>
+          </h2>
+          <form method="get" action="/" className="flex gap-1.5">
+            {query.category && (
+              <input type="hidden" name="category" value={query.category} />
+            )}
+            <label htmlFor="sort" className="sr-only">
+              Trier les discussions
+            </label>
+            <select
+              id="sort"
+              name="sort"
+              defaultValue={query.sort}
+              className="max-w-full rounded-lg border border-border bg-white px-2 py-[7px] text-xs"
+            >
+              <option value="newest">Plus récentes</option>
+              <option value="oldest">Plus anciennes</option>
+            </select>
+            <Button variant="secondary" type="submit">
+              Trier
+            </Button>
+          </form>
         </div>
+        {feed.data.length ? (
+          <section
+            className="divide-y divide-border overflow-hidden rounded-[14px] border border-black/7 bg-white shadow-sm"
+            aria-label="Discussions"
+          >
+            {feed.data.map((discussion) => (
+              <DiscussionCard
+                key={discussion.documentId}
+                discussion={discussion}
+              />
+            ))}
+          </section>
+        ) : (
+          <Notice
+            title={
+              query.page > 1
+                ? "Aucune discussion sur cette page"
+                : "La conversation commence ici"
+            }
+          >
+            <p>
+              {query.page > 1
+                ? "Revenez à la première page pour retrouver les discussions."
+                : "Il n’y a pas encore de discussion dans cet espace. Partagez la première question."}
+            </p>
+            <ButtonLink
+              variant="secondary"
+              className="mt-5"
+              href={
+                query.page > 1
+                  ? feedHref({ ...query, page: 1 })
+                  : "/discussions/nouvelle"
+              }
+            >
+              {query.page > 1 ? "Première page" : "Créer une discussion"}
+            </ButtonLink>
+          </Notice>
+        )}
+        <Pagination
+          pagination={feed.meta.pagination}
+          href={(page) => feedHref({ ...query, page })}
+        />
       </div>
-      {session.unavailable && <p role="status" className="text-sm text-red-700">Le service de connexion est temporairement indisponible. Réessayez dans quelques instants.</p>}
-      <section className="rounded-2xl border border-black/5 bg-white p-8 shadow-sm sm:p-12">
-        <p className="mb-4 text-sm font-semibold text-[#eb0f0f]">Bientôt ici</p>
-        <h1 className="font-serif text-4xl leading-tight font-bold sm:text-5xl">
-          Un espace pour échanger et partager vos expériences.
-        </h1>
-        <p className="mt-6 max-w-xl leading-7 text-neutral-600">
-          Questions d’épargne, placements, retraite : la communauté des lecteurs
-          du Revenu se prépare à vous accueillir.
-        </p>
-      </section>
-    </main>
+      <CommunitySidebar />
+    </PageContainer>
   );
 }
