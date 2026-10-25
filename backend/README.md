@@ -14,4 +14,6 @@ The backend uses the existing local PostgreSQL service and a dedicated restricte
 
 The schemas are available in the Strapi Content Manager after startup. All three forum collections have Draft & Publish disabled. Run `npm run setup:env` and `npm run seed:demo` from the repository root to add demo members, categories, discussions and replies. The data and seed logic are in `src/seeds/`. Reruns keep existing records and passwords; the seed is transactional and is not run automatically at startup.
 
-Forum REST routes and permissions are the next part of phase 2; secure publishing is phase 3. See the root README for demo credentials, field constraints, relationships and type generation.
+The public read API provides categories, discussion summaries/detail and paginated discussion replies. Controllers validate the small query contract; services select safe fields and compute reply counts with native batched relation counts. `src/permissions/forum.ts` configures Public and Authenticated read permissions at every startup. Secure publishing is phase 3.
+
+Run `npm run test:api` from the repository root for HTTP integration tests in an isolated PostgreSQL schema. See the root README for the endpoint contract, demo credentials, field constraints, relationships and type generation.

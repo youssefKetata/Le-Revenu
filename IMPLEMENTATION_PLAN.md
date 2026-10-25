@@ -1,6 +1,6 @@
 # Le Revenu technical test: scope and implementation plan
 
-Status: phase 1 runtime checks complete. Phase 2 includes Category, Discussion and Reply schemas, native user relationships and a repeatable demo seed. The read API and permissions are next. Next.js and Strapi are scaffolded, both phase 1 production builds pass, and both applications start successfully. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432). The Next.js-to-Strapi health check passes.
+Status: phases 1 and 2 complete. Category, Discussion and Reply schemas, native user relationships, the repeatable demo seed and the public read API are implemented. HTTP integration tests verify reads, filtering, sorting, pagination, safe fields, batched reply counts and reproducible permissions. Phase 3 (login and secure publishing) is next. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432); Next.js currently shows a placeholder.
 
 ## 1. Source of truth
 
@@ -139,10 +139,10 @@ Completion gate: both applications start independently and Strapi uses PostgreSQ
 
 - Define the native user relations and Category, Discussion and Reply content types. Implemented; runtime verification is recorded in the README.
 - Create a repeatable, non-destructive demo seed with two member accounts, reference categories, discussions and replies, including a discussion without replies. Implemented as `npm run seed:demo` and verified with `npm run test:seed` against an isolated PostgreSQL schema; credential setup and rerun behavior are documented in the README.
-- Configure public read permissions; implement bounded pagination, category filtering, date sorting and safe author projections.
-- Make demo permissions reproducible rather than relying on undocumented admin clicks.
+- Configure public read permissions; implement bounded pagination, category filtering, date sorting and safe author projections. Implemented and verified by `npm run test:api`.
+- Make demo permissions reproducible rather than relying on undocumented admin clicks. Implemented in `backend/src/permissions/forum.ts`, called by startup bootstrap.
 
-Completion gate: direct API requests return the correct seeded content, relations, counts and pagination.
+Completion gate passed: direct HTTP requests return the correct seeded content, relations, counts and pagination. See the README for the endpoint contract and integration-test commands.
 
 ### Phase 3: Secure publishing, with API tests
 
