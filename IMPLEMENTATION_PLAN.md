@@ -1,6 +1,6 @@
 # Le Revenu technical test: scope and implementation plan
 
-Status: phase 1 runtime checks complete. Phase 2 has begun: Category, Discussion and Reply schemas and the native user relationships are defined. Demo data and the read API are next. Next.js and Strapi are scaffolded, both phase 1 production builds pass, and both applications start successfully. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432). The Next.js-to-Strapi health check passes.
+Status: phase 1 runtime checks complete. Phase 2 includes Category, Discussion and Reply schemas, native user relationships and a repeatable demo seed. The read API and permissions are next. Next.js and Strapi are scaffolded, both phase 1 production builds pass, and both applications start successfully. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432). The Next.js-to-Strapi health check passes.
 
 ## 1. Source of truth
 
@@ -59,6 +59,8 @@ Keep the application coherent: omit unsupported actions instead of leaving simul
 | Tests | Small API integration suite plus frontend rendering tests | Covers the brief without requiring a large end-to-end suite |
 
 Version policy: choose stable compatible releases at scaffolding, keep Strapi on major v5, and record the exact tested versions. No experimental releases.
+
+This is a new project: use the current stack and data model directly. Do not add backward-compatibility layers, legacy identifier fallbacks or upgrades for older configuration formats. Input validation and repeatable, non-destructive seeding remain required.
 
 Observed on this machine during requirements review:
 
@@ -136,7 +138,7 @@ Completion gate: both applications start independently and Strapi uses PostgreSQ
 ### Phase 2: Data model, demo data and read API
 
 - Define the native user relations and Category, Discussion and Reply content types. Implemented; runtime verification is recorded in the README.
-- Create a repeatable, non-destructive demo seed with two member accounts, reference categories, discussions and replies, including a discussion without replies.
+- Create a repeatable, non-destructive demo seed with two member accounts, reference categories, discussions and replies, including a discussion without replies. Implemented as `npm run seed:demo` and verified with `npm run test:seed` against an isolated PostgreSQL schema; credential setup and rerun behavior are documented in the README.
 - Configure public read permissions; implement bounded pagination, category filtering, date sorting and safe author projections.
 - Make demo permissions reproducible rather than relying on undocumented admin clicks.
 
