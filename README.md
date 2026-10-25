@@ -4,7 +4,7 @@ Technical assignment: a community forum built with Next.js App Router, React, Ty
 
 ## Current scope
 
-Phase 1 is complete: applications, database connection and local startup are verified. The frontend currently shows a small French placeholder page. Discussion schemas, demo members, publishing and forum screens are planned in the [implementation plan](IMPLEMENTATION_PLAN.md).
+Phase 1 is complete: applications, database connection and local startup are verified. Phase 2 has begun with the forum content-type schemas and native user relationships. The frontend currently shows a small French placeholder page. Demo members, read endpoints, publishing and forum screens are planned in the [implementation plan](IMPLEMENTATION_PLAN.md).
 
 ```text
 frontend/                 Next.js application
@@ -91,6 +91,29 @@ The frontend connection check returns HTTP 200 when Next.js can reach Strapi, or
 
 Stop application processes with Ctrl+C. Your existing PostgreSQL Windows service stays under its normal Windows service management.
 
+## Forum content model
+
+The versioned schemas live under `backend/src/api/<name>/content-types/<name>/schema.json`:
+
+| Collection | Fields and relationships |
+| --- | --- |
+| Category | Required name and unique slug (generated from the name); optional description, icon key and six-digit hex color; many discussions |
+| Discussion | Required title (10-255 characters), plain-text content and type (`question` or `discussion`); one author, one category and many replies |
+| Reply | Required plain-text content; one author and one discussion |
+| User | Native Users & Permissions user, extended with many discussions and replies |
+
+`backend/src/extensions/users-permissions/strapi-server.ts` adds the inverse author relationships while preserving the plugin's native authentication fields. Forum members are distinct from Strapi administrators.
+
+Draft & Publish is disabled on all three forum collections. Contributions have a single immediately visible version; `createdAt` is the publication date used by the forum. Strapi supplies timestamps and `documentId` values.
+
+Start Strapi and open its Content Manager to see Category, Discussion, Reply and User. Strapi synchronizes their tables and relations to the configured project database at startup. This step does not seed records, expose forum REST routes or grant member/public permissions. Whitespace validation, authenticated author assignment and other publishing rules will be implemented in phase 3.
+
+After changing schemas or the user extension, regenerate the checked-in backend types:
+
+```powershell
+npm --prefix backend run strapi -- ts:generate-types
+```
+
 ## Checks and production-mode startup
 
 Run checks and builds sequentially on an 8 GB machine:
@@ -138,6 +161,17 @@ Verified locally with Node.js 24.21.0, npm 11.19.0, Next.js 16.4.3, React 19.3.0
 - Next.js serves the home page (HTTP 200), missing routes (HTTP 404), and `/api/health` (HTTP 200 with both services healthy).
 - `/api/health` returns HTTP 503 when Strapi is stopped and uses `Cache-Control: no-store`.
 - Environment generation preserves existing files; real secrets remain excluded from Git.
+
+## Phase 2 schema verification
+
+Verified against the configured local PostgreSQL database:
+
+- Backend type checking, schema type generation and the production admin build pass.
+- Strapi starts with the new schemas; `/_health` returns HTTP 204 and `/admin` returns HTTP 200.
+- Content Manager lists Category, Discussion, Reply and the native User collection.
+- Temporary records verify both directions of user/discussion, user/reply, category/discussion and discussion/reply relationships.
+- Eleven invalid-input checks reject short/long titles, empty content, unsupported discussion types, missing required relations, an invalid category color and a duplicate category slug.
+- Native user authentication attributes remain intact. All temporary records were rolled back; no demo content was seeded.
 
 ## Source material
 

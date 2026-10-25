@@ -1,6 +1,6 @@
 # Le Revenu technical test: scope and implementation plan
 
-Status: phase 1 runtime checks complete. Next.js and Strapi are scaffolded, both production builds pass, and both applications start successfully. Strapi initialized its system tables in the dedicated database on the existing PostgreSQL Windows service (port 5432). The Next.js-to-Strapi health check passes. Phase 2 (content types and demo data) is next.
+Status: phase 1 runtime checks complete. Phase 2 has begun: Category, Discussion and Reply schemas and the native user relationships are defined. Demo data and the read API are next. Next.js and Strapi are scaffolded, both phase 1 production builds pass, and both applications start successfully. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432). The Next.js-to-Strapi health check passes.
 
 ## 1. Source of truth
 
@@ -135,7 +135,7 @@ Completion gate: both applications start independently and Strapi uses PostgreSQ
 
 ### Phase 2: Data model, demo data and read API
 
-- Define the native user relations and Category, Discussion and Reply content types.
+- Define the native user relations and Category, Discussion and Reply content types. Implemented; runtime verification is recorded in the README.
 - Create a repeatable, non-destructive demo seed with two member accounts, reference categories, discussions and replies, including a discussion without replies.
 - Configure public read permissions; implement bounded pagination, category filtering, date sorting and safe author projections.
 - Make demo permissions reproducible rather than relying on undocumented admin clicks.
