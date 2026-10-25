@@ -20,7 +20,8 @@
     "content": {
       "type": "text",
       "required": true,
-      "minLength": 1
+      "minLength": 1,
+      "maxLength": 50000
     },
     "type": {
       "type": "enumeration",

@@ -1,6 +1,6 @@
 # Le Revenu technical test: scope and implementation plan
 
-Status: phases 1 and 2 complete. Category, Discussion and Reply schemas, native user relationships, the repeatable demo seed and the public read API are implemented. HTTP integration tests verify reads, filtering, sorting, pagination, safe fields, batched reply counts and reproducible permissions. Phase 3 (login and secure publishing) is next. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432); Next.js currently shows a placeholder.
+Status: phases 1 and 2 complete; phase 3 login/logout and secure publishing are implemented locally for review. Five focused integration scenarios verify seeding, reads, sessions, publishing, validation and author protection. Next.js has a login page and session-aware placeholder home; browser login/logout verification is pending because a saved browser permission or managed policy still denies the local test origin. Phase 4 adds the forum screens and publishing forms. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432).
 
 ## 1. Source of truth
 
@@ -105,7 +105,7 @@ Request flow: browser -> Next.js presentation/session transport -> Strapi REST -
 - Filters, sort order and page state use URL query parameters so they survive reload and sharing.
 - A thin Next.js Server Action or Route Handler may forward a user's authenticated request. All domain validation, author assignment and authorization remain enforced independently in Strapi.
 - Simple demo login delegates credential checking to Strapi. Store its token in an HttpOnly session cookie, with secure production settings and appropriate expiry. Do not expose a shared privileged API token to the browser.
-- The scaffold currently enables Strapi refresh sessions with HttpOnly refresh cookies and a default ten-minute access-token lifetime. In phase 3, either implement refresh-cookie forwarding and token rotation through Next.js, or deliberately expire the frontend session with the access token and require login again. A server-side fetch to Strapi does not automatically forward its Set-Cookie response to the browser.
+- Phase 3 deliberately uses fixed ten-minute access tokens and sessions. Next.js stores only the access token in its own HttpOnly cookie; it discards the native server-side refresh token and requires login again after expiry. No refresh-cookie forwarding or token rotation is implemented. Native session revocation is checked by a Strapi policy on publishing and current-user requests.
 - Strapi assigns `author` from `ctx.state.user`; reject a client-supplied author field. Apply this to both discussions and replies.
 - Allow only intended input fields. Validate related category/discussion identifiers and return coherent 400/401/403/404 errors as appropriate.
 - Grant Public read access only to intended content. Grant authenticated members intended create access. Leave unnecessary update/delete and category-management actions disabled.
@@ -138,7 +138,7 @@ Completion gate: both applications start independently and Strapi uses PostgreSQ
 ### Phase 2: Data model, demo data and read API
 
 - Define the native user relations and Category, Discussion and Reply content types. Implemented; runtime verification is recorded in the README.
-- Create a repeatable, non-destructive demo seed with two member accounts, reference categories, discussions and replies, including a discussion without replies. Implemented as `npm run seed:demo` and verified with `npm run test:seed` against an isolated PostgreSQL schema; credential setup and rerun behavior are documented in the README.
+- Create a repeatable, non-destructive demo seed with two member accounts, reference categories, discussions and replies, including a discussion without replies. Implemented as `npm run seed:demo` and verified with `npm run test:api` against an isolated PostgreSQL schema; credential setup and rerun behavior are documented in the README.
 - Configure public read permissions; implement bounded pagination, category filtering, date sorting and safe author projections. Implemented and verified by `npm run test:api`.
 - Make demo permissions reproducible rather than relying on undocumented admin clicks. Implemented in `backend/src/permissions/forum.ts`, called by startup bootstrap.
 
@@ -146,12 +146,12 @@ Completion gate passed: direct HTTP requests return the correct seeded content, 
 
 ### Phase 3: Secure publishing, with API tests
 
-- Add minimal demo login/logout.
-- Implement authenticated discussion/reply creation in Strapi.
-- Enforce title/content/type/relation validation and reject author spoofing or unwanted fields.
-- Add API integration tests using a separate test database. Test the actual Strapi HTTP surface, not only mocked validation functions.
+- Add minimal demo login/logout. Implemented with native Strapi auth, Next.js Server Actions and an HttpOnly cookie. Browser UI verification is pending.
+- Implement authenticated discussion/reply creation in Strapi. Implemented as two POST endpoints with permission and active-session checks.
+- Enforce title/content/type/relation validation and reject author spoofing or unwanted fields. Implemented in Strapi's publishing input parser and services.
+- Add API integration tests using an isolated PostgreSQL test schema. Implemented in `scripts/forum-api.test.mjs`; tests call the actual Strapi HTTP surface, including native login/logout.
 
-Completion gate: valid writes persist; invalid, unauthenticated and impersonation attempts fail independently of Next.js.
+API completion gate passed: valid writes persist; invalid, unauthenticated and impersonation attempts fail independently of Next.js. Frontend browser verification remains pending; all phase 3 changes stay local until explicitly approved for push.
 
 ### Phase 4: Complete the core Next.js journey
 

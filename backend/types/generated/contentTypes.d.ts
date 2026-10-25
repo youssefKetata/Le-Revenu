@@ -510,6 +510,7 @@ export interface ApiDiscussionDiscussion extends Struct.CollectionTypeSchema {
     content: Schema.Attribute.Text &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMaxLength<{
+        maxLength: 50000;
         minLength: 1;
       }>;
     createdAt: Schema.Attribute.DateTime;
@@ -556,6 +557,7 @@ export interface ApiReplyReply extends Struct.CollectionTypeSchema {
     content: Schema.Attribute.Text &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMaxLength<{
+        maxLength: 10000;
         minLength: 1;
       }>;
     createdAt: Schema.Attribute.DateTime;

@@ -45,9 +45,9 @@ export function feedQuery(query: Record<string, unknown>): FeedQuery {
   return { ...pagination(query), category, order: sort === 'oldest' ? 'asc' : 'desc' };
 }
 
-export function readDocumentId(value: unknown): string {
+export function readDocumentId(value: unknown, field = 'documentId'): string {
   if (typeof value !== 'string' || !/^[a-z0-9]{24}$/.test(value)) {
-    throw new errors.ValidationError('A valid Strapi documentId is required.');
+    throw new errors.ValidationError(`${field} must be a valid Strapi documentId.`, { field });
   }
   return value;
 }

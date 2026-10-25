@@ -1,6 +1,7 @@
 import type { Core, Data, Modules } from '@strapi/strapi';
 import { errors } from '@strapi/utils';
 import { pageMeta, type FeedQuery } from '../../../utils/read-query';
+import type { DiscussionInput } from '../../../utils/publish-input';
 
 const populate = {
   author: { fields: ['username'] },
@@ -24,6 +25,20 @@ function summary(row: SummaryRow) {
 }
 
 export default ({ strapi }: { strapi: Core.Strapi }) => ({
+  async publish(author: string, input: DiscussionInput) {
+    return strapi.db.transaction(async () => {
+      const category = await strapi.documents('api::category.category').findOne({
+        documentId: input.category, fields: ['name'],
+      });
+      if (!category) throw new errors.NotFoundError('Category not found.');
+      const row = await strapi.documents('api::discussion.discussion').create({
+        data: { title: input.title, content: input.content, type: input.type, category: category.documentId, author },
+        fields: ['title', 'content', 'type', 'createdAt'],
+        populate,
+      });
+      return { data: { ...summary(row), content: row.content }, meta: {} };
+    });
+  },
   async findPage(page: FeedQuery) {
     const documents = strapi.documents('api::discussion.discussion');
     const filters = page.category ? { category: { slug: page.category } } : {};

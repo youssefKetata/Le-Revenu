@@ -6,23 +6,31 @@ const readActions = [
   'api::discussion.discussion.findOne',
   'api::reply.reply.find',
 ];
+const memberActions = [
+  ...readActions,
+  'api::discussion.discussion.create',
+  'api::reply.reply.create',
+  'plugin::users-permissions.user.me',
+  'plugin::users-permissions.auth.logout',
+];
 
 export async function configureForumPermissions(strapi: Core.Strapi): Promise<void> {
   await strapi.db.transaction(async () => {
     const permissions = strapi.db.query('plugin::users-permissions.permission');
     for (const type of ['public', 'authenticated']) {
+      const allowed = type === 'authenticated' ? memberActions : readActions;
       const role = await strapi.db.query('plugin::users-permissions.role').findOne({ where: { type } });
       if (!role) throw new Error(`Missing Strapi ${type} role.`);
       const existing = await permissions.findMany({ where: { role: { id: role.id } } });
       for (const permission of existing) {
         const forumAction = ['category', 'discussion', 'reply'].some(name => permission.action.startsWith(`api::${name}.${name}.`));
-        const userManagement = permission.action.startsWith('plugin::users-permissions.user.')
-          && permission.action !== 'plugin::users-permissions.user.me';
-        if ((forumAction && !readActions.includes(permission.action)) || userManagement) {
+        const userManagement = permission.action.startsWith('plugin::users-permissions.user.');
+        const memberLogout = permission.action === 'plugin::users-permissions.auth.logout';
+        if ((forumAction || userManagement || memberLogout) && !allowed.includes(permission.action)) {
           await permissions.delete({ where: { id: permission.id } });
         }
       }
-      for (const action of readActions) {
+      for (const action of allowed) {
         if (!existing.some(permission => permission.action === action)) {
           await permissions.create({ data: { action, role: role.id } });
         }

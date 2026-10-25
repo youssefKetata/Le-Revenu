@@ -28,7 +28,13 @@ const config = ({ env }: Core.Config.Shared.ConfigParams): Core.Config.Plugin =>
     config: {
       jwtManagement: 'refresh',
       sessions: {
-        httpOnly: true,
+        // Next.js keeps only the access token in its own HttpOnly cookie.
+        // The native refresh token is not forwarded or stored by the frontend.
+        httpOnly: false,
+        accessTokenLifespan: 600,
+        maxSessionLifespan: 600,
+        maxRefreshTokenLifespan: 600,
+        idleRefreshTokenLifespan: 600,
       },
     },
   },
