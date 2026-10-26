@@ -4,7 +4,7 @@ Technical assignment: a community forum built with Next.js App Router, React, Ty
 
 ## Current scope
 
-Phases 1–4 are implemented, with the v2 UI applied within the assignment's existing feature scope: live feeds, category filters, date sorting, detailed/compact views, discussion/reply pages, and shadcn/ui login/publishing dialogs with standalone URLs. The HTTP journey and focused rendering tests pass. See the [implementation plan](IMPLEMENTATION_PLAN.md).
+Phases 1–4 are implemented, with the v2 UI and approved discussion-search bonus: live feeds, category filters, date sorting, detailed/compact views, discussion/reply pages, and shadcn/ui login/publishing dialogs with standalone URLs. The HTTP journey and focused rendering tests pass. See the [implementation plan](IMPLEMENTATION_PLAN.md).
 
 ```text
 frontend/                 Next.js application
@@ -146,7 +146,7 @@ Start Strapi with `npm run dev:backend`. The API base URL is `http://127.0.0.1:1
 | Method and path | Purpose | Query parameters |
 | --- | --- | --- |
 | `GET /categories` | Categories with names, slugs, descriptions, icon keys and colors | `page`, `pageSize` |
-| `GET /discussions` | Discussion summaries with author, category, date and reply count | `category` (slug), `sort` (`newest` or `oldest`), `page`, `pageSize` |
+| `GET /discussions` | Discussion summaries with author, category, date and reply count | `q` (search), `category` (slug), `sort` (`newest` or `oldest`), `page`, `pageSize` |
 | `GET /discussions/:documentId` | Discussion content and summary fields | None |
 | `GET /discussions/:documentId/replies` | Replies for one discussion, oldest first | `page`, `pageSize` |
 
@@ -158,7 +158,11 @@ The feed returns `documentId`, `title`, `excerpt`, `type`, `createdAt`, `author`
 
 Queries fetch explicit fields and relations through Strapi's Document Service. Reply counts use Strapi's count-only relation population, which runs one grouped count for the page instead of fetching reply bodies or counting each discussion separately. Replies are fetched and paginated independently. Reads send `Cache-Control: no-store` so dashboard edits appear on the next request.
 
-Invalid numbers, malformed document IDs and unsupported query options return HTTP 400. Missing discussions return HTTP 404, including on the replies route. Arbitrary `fields`, `populate`, `filters` and search parameters are not accepted by this focused API.
+Search uses `q`, for example `/api/discussions?q=PDF&category=bourse&sort=oldest`. It matches a literal, case-insensitive phrase in the title or discussion content through Strapi's Document Service `$containsi` filters. Accents remain significant; replies and author names are not searched. Input is limited to 200 characters before trimming; blank input removes the search. Category filtering, date sorting and pagination apply to the same matching set, including its total count. Native Strapi escapes SQL wildcard characters. The frontend submits explicitly through a Next.js GET Form, resets the page, preserves category/sort/view and offers a clear-search link. Overlong input shows a small inline error.
+
+This is substring search for the assignment's dataset. It adds no per-result queries and retains bounded previews/responses, but matching text and counting results can scan the table. A large forum would need measured query plans and an indexed search strategy; ordinary B-tree indexes do not accelerate arbitrary substring matching.
+
+Invalid numbers, malformed document IDs, repeated/structured or overlong search values and unsupported query options return HTTP 400. Missing discussions return HTTP 404, including on the replies route. Arbitrary `fields`, `populate` and `filters` are not accepted by this focused API.
 
 `backend/src/permissions/forum.ts` runs at startup and reproducibly grants these four read actions to Public and Authenticated members. Authenticated members also receive discussion/reply creation, current-user and logout permissions. Other forum actions and user-directory/management endpoints remain forbidden; dashboard administrator permissions are separate. Self-registration is disabled because this project uses seeded members. Code owns these settings, so changing forum permissions only in the dashboard is not a persistent configuration change.
 
@@ -253,29 +257,32 @@ Run the backend integration suite with:
 npm run test:api
 ```
 
-The suite starts real Strapi HTTP endpoints in an isolated PostgreSQL schema and removes that schema in cleanup. The configured database role must be able to create schemas. Five focused scenarios cover:
+The suite starts real Strapi HTTP endpoints in an isolated PostgreSQL schema and removes that schema in cleanup. The configured database role must be able to create schemas. Six focused scenarios cover:
 
 - Fresh demo seeding and reruns that preserve edited content and password hashes.
 - Safe feed fields, filtering, sorting, pagination and one grouped reply-count query per page.
+- Title/content search, literal wildcard handling, input bounds and combined category/sort/pagination.
 - Native login and persistent discussion/reply creation with authenticated authors.
 - Validation, missing relations, anonymous/forged requests and author-spoofing protection.
 - Expired, blocked, underprivileged and logged-out sessions being unable to publish.
 
-With both development servers running and demo data seeded, run two read-only frontend rendering scenarios:
+With both development servers running and demo data seeded, run three read-only frontend rendering scenarios:
 
 ```powershell
 npm run test:frontend
 ```
 
-These compare rendered discussions and replies with live Strapi data, verify filtering/order and metadata, and exercise empty/invalid/missing pages and anonymous publishing navigation. They require `http://localhost:3000` and `http://127.0.0.1:1337` by default; override with `TEST_FRONTEND_URL` and `TEST_STRAPI_URL`. No database records are changed.
+These compare rendered discussions and replies with live Strapi data, verify search/filter/order and metadata, and exercise empty/invalid/missing pages and anonymous publishing navigation. They require `http://localhost:3000` and `http://127.0.0.1:1337` by default; override with `TEST_FRONTEND_URL` and `TEST_STRAPI_URL`. No database records are changed.
 
 A separate local HTTP form check also passed Next.js login, native validation feedback, discussion creation, reply publication, reload, content escaping and logout. Its temporary discussion/reply were removed. Desktop/mobile browser checks now cover the rendered v2 layout, native login, publishing dialog and navigation. The tool cannot open the local-file mockup, so reference comparisons use its HTML/CSS values; this is not a claim of screenshot-perfect comparison. Drafts remain in memory after validation errors and are lost on reload or closing the form.
 
 For the v2 changes, the five backend scenarios, two frontend rendering scenarios, frontend lint/TypeScript and both production builds pass. Browser checks used the normal desktop viewport and a 390 × 844 mobile viewport, including account-menu logout and Escape dismissal of dialogs.
 
+After adding discussion search, all six backend scenarios and three frontend rendering scenarios pass, along with frontend/backend TypeScript, frontend lint and the frontend production build. Browser checks cover Enter submission, category/date-order preservation, inline length errors, empty results, clearing, browser Back and reload. Desktop and 390 × 844 mobile layouts were checked; no browser console warnings/errors were reported.
+
 ## Frontend journey and rendering
 
-- `/` renders live, paginated discussions through Server Components. `category`, `sort`, `page` and compact `view` stay in the URL; filtering/sorting reset to page one. Filter, sort and view links work without client JavaScript.
+- `/` renders live, paginated discussions through Server Components. `q`, `category`, `sort`, `page` and compact `view` stay in the URL; searching/filtering/sorting reset to page one. Search and filter/sort/view navigation also work without client JavaScript.
 - `/discussions/[documentId]` renders the discussion, public author/date/category and paginated replies. Content is rendered as React text with preserved line breaks, never interpreted as HTML. Missing discussions use the not-found page; service failures show a retry state.
 - `/discussions/nouvelle` requires a verified member. Login, publishing and reply forms use custom validation with small red field errors, first-error focus and live correction after submission. Browser constraint popups and native length caps are disabled; Strapi remains responsible for authoritative publishing validation. Only intended fields are forwarded, and Strapi assigns the author.
 - Successful creation redirects to the new discussion. Reply publication redirects to the final reply page and the new reply's anchor. Both invalidate affected Next.js routes; API reads remain uncached.
@@ -286,7 +293,7 @@ Frontend structure is organized by responsibility: `components/ui/` contains sha
 
 Ordinary component styles use Tailwind utilities and shared controls. Light/dark tokens live in `frontend/src/styles/theme.css`; global CSS is limited to font loading, Tailwind aliases and base rules. Small colocated CSS Modules handle layered gradients. The shared shadcn/ui Dialog uses Radix and `tw-animate-css` for accessible animated overlays. Login/publishing use Next.js intercepted routes on client navigation and standalone pages on direct visits. Expected service failures have explicit feedback; unexpected code errors reach the route error boundary. Backend structure stays within Strapi's native controllers/services/policies conventions, with no extra repository layer or parallel Next.js business backend.
 
-The current visual reference is `maquette-communaute-le-revenu-v2.html`. Its unsupported search, polls/votes, best answers, notifications, profiles/points, blogs, events and editorial tools remain excluded. Metrics and content come from Strapi. Authentication uses community demo accounts rather than lerevenu.com SSO, and discussion content remains mandatory as required by the PDF. The spaces and charter links have real pages; the top external editorial links retain the mockup's lerevenu.com destination.
+The current visual reference is `maquette-communaute-le-revenu-v2.html`. Discussion search is implemented as an approved PDF bonus. Its unsupported polls/votes, best answers, notifications, profiles/points, blogs, events and editorial tools remain excluded. Metrics and content come from Strapi. Authentication uses community demo accounts rather than lerevenu.com SSO, and discussion content remains mandatory as required by the PDF. The spaces and charter links have real pages; the top external editorial links retain the mockup's lerevenu.com destination.
 
 ## Source material
 

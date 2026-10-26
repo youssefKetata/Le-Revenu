@@ -43,7 +43,10 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
   },
   async findPage(page: FeedQuery) {
     const documents = strapi.documents('api::discussion.discussion');
-    const filters = page.category ? { category: { slug: page.category } } : {};
+    const filters = {
+      ...(page.category ? { category: { slug: page.category } } : {}),
+      ...(page.q ? { $or: [{ title: { $containsi: page.q } }, { content: { $containsi: page.q } }] } : {}),
+    };
     const [rows, total] = await Promise.all([
       documents.findMany({
         fields: ['title', 'type', 'createdAt'],

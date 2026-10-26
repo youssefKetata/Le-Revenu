@@ -1,7 +1,7 @@
 import { errors } from '@strapi/utils';
 
 export type Page = { page: number; pageSize: number; start: number; limit: number };
-export type FeedQuery = Page & { category?: string; order: 'asc' | 'desc' };
+export type FeedQuery = Page & { category?: string; q?: string; order: 'asc' | 'desc' };
 
 export function allowQuery(query: Record<string, unknown>, names: string[]): void {
   for (const name of Object.keys(query)) {
@@ -34,15 +34,18 @@ export function pageQuery(query: Record<string, unknown>): Page {
 }
 
 export function feedQuery(query: Record<string, unknown>): FeedQuery {
-  allowQuery(query, ['page', 'pageSize', 'category', 'sort']);
-  const { category, sort = 'newest' } = query;
+  allowQuery(query, ['page', 'pageSize', 'category', 'sort', 'q']);
+  const { category, sort = 'newest', q } = query;
+  if (q !== undefined && (typeof q !== 'string' || q.length > 200)) {
+    throw new errors.ValidationError('q must be a string of at most 200 characters.');
+  }
   if (category !== undefined && (typeof category !== 'string' || !category.trim() || category.length > 255)) {
     throw new errors.ValidationError('category must be a nonempty slug of at most 255 characters.');
   }
   if (sort !== 'newest' && sort !== 'oldest') {
     throw new errors.ValidationError('sort must be newest or oldest.');
   }
-  return { ...pagination(query), category, order: sort === 'oldest' ? 'asc' : 'desc' };
+  return { ...pagination(query), category, q: q?.trim() || undefined, order: sort === 'oldest' ? 'asc' : 'desc' };
 }
 
 export function readDocumentId(value: unknown, field = 'documentId'): string {

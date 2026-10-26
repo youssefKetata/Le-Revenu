@@ -82,6 +82,27 @@ test("feed renders API discussions, preserves filter/order and handles empty or 
   assert.ok((await page("/charte")).includes("Bienveillance"));
 });
 
+test("search renders filtered API results and keeps search in navigation", async () => {
+  const query = "?category=bourse&q=PDF&sort=oldest&view=compact";
+  const result = await api("/discussions?category=bourse&q=PDF&sort=oldest&pageSize=20");
+  assert.ok(result.data.length, "Seeded Bourse discussions include PDF content.");
+  const html = await page(`/${query}`);
+  const cards = html.match(/<article\b[^>]*>[\s\S]*?<\/article>/g) ?? [];
+  assert.equal(cards.length, result.data.length);
+  result.data.forEach((item, index) => assert.ok(cards[index].includes(escapeHtml(item.title))));
+  assert.ok(html.includes('name="q"'));
+  assert.ok(html.includes('value="PDF"'));
+  assert.ok(html.includes('/?category=bourse&amp;q=PDF&amp;view=compact'));
+  assert.ok(html.includes('/?category=immobilier&amp;q=PDF&amp;sort=oldest&amp;view=compact'));
+  assert.ok(html.includes('name="category" value="bourse"'));
+  assert.ok(html.includes('name="sort" value="oldest"'));
+  assert.ok(html.includes('name="view" value="compact"'));
+  assert.ok((await page("/?q=no-matching-discussion-for-render-test")).includes("Aucune discussion trouvée"));
+  for (const query of [`q=${'x'.repeat(201)}`, "q=a&q=b"]) {
+    assert.ok((await page(`/?${query}`)).includes("Filtres invalides"));
+  }
+});
+
 test("detail renders persisted content/replies, offers login and handles missing discussions", async () => {
   const feed = await api("/discussions?pageSize=1");
   const id = feed.data[0].documentId;

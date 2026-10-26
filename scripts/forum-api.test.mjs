@@ -111,6 +111,32 @@ test('forum integration', { timeout: 90_000 }, async t => {
       assert.equal((await request('/api/discussions?populate=*')).status, 400);
     });
 
+    await t.test('search matches titles and content literally with category, sorting and pagination', async () => {
+      for (const q of ['  RAPPORT ANNUEL  ', 'PDF complet']) {
+        const result = await request(`/api/discussions?${new URLSearchParams({ q })}`);
+        assert.equal(result.status, 200);
+        assert.deepEqual(result.body.data.map(row => row.documentId), [ids[4]]);
+        assert.equal(result.body.meta.pagination.total, 1);
+      }
+      const accented = await request(`/api/discussions?${new URLSearchParams({ q: 'DÉCLARATION' })}`);
+      assert.deepEqual(accented.body.data.map(row => row.documentId), [ids[3]]);
+      const combined = await request('/api/discussions?q=je&category=bourse&sort=oldest&pageSize=1&page=2');
+      assert.equal(combined.status, 200);
+      assert.deepEqual(combined.body.data.map(row => row.documentId), [ids[4]]);
+      assert.deepEqual(combined.body.meta.pagination, { page: 2, pageSize: 1, pageCount: 2, total: 2 });
+      for (const q of ['no-matching-discussion', '%', '_', '\\', "x' OR 1=1 --"]) {
+        const result = await request(`/api/discussions?${new URLSearchParams({ q })}`);
+        assert.equal(result.status, 200);
+        assert.deepEqual(result.body.data, []);
+        assert.equal(result.body.meta.pagination.total, 0);
+      }
+      assert.equal((await request('/api/discussions?q=%20%20')).body.meta.pagination.total, 5);
+      for (const query of [`q=${'x'.repeat(201)}`, 'q=a&q=b', 'q[$contains]=a']) {
+        assert.equal((await request(`/api/discussions?${query}`)).status, 400);
+      }
+      assert.equal((await request(`/api/discussions?q=${'x'.repeat(200)}`)).status, 200);
+    });
+
     await t.test('native login and publishing persist the authenticated authors and reply count', async () => {
       assert.equal((await request('/api/auth/local', post({ identifier: fixtures.demoUsers[0].username, password: 'wrong-password' }))).status, 400);
       const first = await request('/api/auth/local', post({ identifier: fixtures.demoUsers[0].username, password: passwords.DEMO_CAMILLE_PASSWORD }));

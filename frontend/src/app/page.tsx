@@ -6,6 +6,7 @@ import DiscussionCard from "@/components/forum/discussion-card";
 import FeedControls from "@/components/forum/feed-controls";
 import QuickComposer from "@/components/forum/quick-composer";
 import Pagination from "@/components/forum/pagination";
+import DiscussionSearch from "@/components/forum/discussion-search";
 import { ButtonLink } from "@/components/ui/button";
 import { Notice, ServiceError } from "@/components/ui/notice";
 import { getCategories, getDiscussions } from "@/lib/forum/api";
@@ -23,7 +24,10 @@ export default async function Home({
     return (
       <PageContainer>
         <Notice title="Filtres invalides">
-          <p>Vérifiez la catégorie, le tri et le numéro de page.</p>
+          <p>
+            Vérifiez la recherche (200 caractères maximum), la catégorie, le tri
+            et le numéro de page.
+          </p>
           <ButtonLink variant="secondary" className="mt-5" href="/">
             Revenir aux discussions
           </ButtonLink>
@@ -53,7 +57,11 @@ export default async function Home({
     >
       <CategoryNav categories={categories} query={query} />
       <div className="flex min-w-0 flex-col gap-[18px]">
-        {session.member && !category ? (
+        {query.q ? (
+          <h1 className="font-serif text-[26px] font-bold tracking-[-.01em]">
+            Rechercher une discussion
+          </h1>
+        ) : session.member && !category ? (
           <h1 className="font-serif text-[26px] font-bold tracking-[-.01em] wrap-anywhere">
             Bonjour {session.member.username}
           </h1>
@@ -69,6 +77,11 @@ export default async function Home({
           category={category?.documentId}
         />
         <CategoryScroller categories={categories} query={query} />
+        <DiscussionSearch
+          key={query.q ?? ""}
+          query={query}
+          total={feed.meta.pagination.total}
+        />
         <FeedControls query={query} />
         {feed.data.length ? (
           <section
@@ -95,13 +108,17 @@ export default async function Home({
             title={
               query.page > 1
                 ? "Aucune discussion sur cette page"
-                : "La conversation commence ici"
+                : query.q
+                  ? "Aucune discussion trouvée"
+                  : "La conversation commence ici"
             }
           >
             <p>
               {query.page > 1
                 ? "Revenez à la première page pour retrouver les discussions."
-                : "Il n’y a pas encore de discussion dans cet espace. Partagez la première question."}
+                : query.q
+                  ? "Essayez une autre expression ou changez d’espace."
+                  : "Il n’y a pas encore de discussion dans cet espace. Partagez la première question."}
             </p>
             <ButtonLink
               variant="secondary"
@@ -109,10 +126,16 @@ export default async function Home({
               href={
                 query.page > 1
                   ? feedHref({ ...query, page: 1 })
-                  : "/discussions/nouvelle"
+                  : query.q
+                    ? feedHref({ ...query, q: undefined, page: 1 })
+                    : "/discussions/nouvelle"
               }
             >
-              {query.page > 1 ? "Première page" : "Créer une discussion"}
+              {query.page > 1
+                ? "Première page"
+                : query.q
+                  ? "Voir les discussions"
+                  : "Créer une discussion"}
             </ButtonLink>
           </Notice>
         )}

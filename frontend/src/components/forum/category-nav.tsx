@@ -67,6 +67,7 @@ export default function CategoryNav({
           aria-current={query?.category === category.slug ? "page" : undefined}
           href={feedHref({
             category: category.slug,
+            q: query?.q,
             sort: query?.sort,
             view: query?.view,
           })}
@@ -106,6 +107,7 @@ export function CategoryScroller({
             key={category.documentId}
             href={feedHref({
               category: category.slug || undefined,
+              q: query.q,
               sort: query.sort,
               view: query.view,
             })}

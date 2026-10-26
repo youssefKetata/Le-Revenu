@@ -1,6 +1,6 @@
 # Le Revenu technical test: scope and implementation plan
 
-Status: phases 1–4 implemented, with the v2 design applied within the existing assignment scope. Five focused backend scenarios verify seeding, reads, bounded excerpts, sessions, publishing, validation and author protection. Two frontend HTTP rendering scenarios pass, and a local HTTP form journey passed login → create → reply → reload → logout with temporary records cleaned up. Desktop/mobile browser verification is now accessible for the app; the local-file mockup remains unavailable to the browser tool. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432).
+Status: phases 1–4 implemented, with the v2 design and approved discussion-search bonus. Six focused backend scenarios cover seeding, reads, search, bounded excerpts, sessions, publishing, validation and author protection. Three frontend HTTP rendering scenarios cover feeds, search and details. A local HTTP form journey passed login → create → reply → reload → logout with temporary records cleaned up. Desktop/mobile browser verification is accessible for the app; the local-file mockup remains unavailable to the browser tool. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432).
 
 ## 1. Source of truth
 
@@ -175,8 +175,8 @@ Completion gate: a reviewer can reproduce the project locally from the repositor
 
 ### Phase 6: Optional extras and review preparation
 
-- First optional extra: simple visible pagination controls, since the API already supports pagination.
-- Next optional extra: discussion search, only after all core checks pass.
+- Visible discussion/reply pagination controls are implemented.
+- Discussion search is implemented as an approved bonus: bounded `q` input, native Strapi title/content filtering, URL state and existing category/sort/pagination. No external search service or compatibility layer.
 - Add a small Playwright journey if useful and affordable on the machine.
 - Add votes/best answer only if there is enough time to implement and test their authorization rules.
 - Prepare a concise walkthrough explaining the model, Strapi boundaries, permissions, data fetching, freshness and tradeoffs.

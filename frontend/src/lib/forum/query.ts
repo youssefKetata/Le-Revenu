@@ -3,6 +3,7 @@ export const maxPaginationOffset = 100_000;
 export type SearchParams = Record<string, string | string[] | undefined>;
 export type FeedQuery = {
   category?: string;
+  q?: string;
   sort: "newest" | "oldest";
   page: number;
   view?: "compact";
@@ -30,8 +31,10 @@ export function readFeedQuery(params: SearchParams): FeedQuery | null {
   const sort = params.sort ?? "newest";
   const category = params.category;
   const view = params.view;
+  const q = params.q;
   if (
     !page ||
+    (q !== undefined && (typeof q !== "string" || q.length > 200)) ||
     (view !== undefined && view !== "compact") ||
     (sort !== "newest" && sort !== "oldest") ||
     (category !== undefined &&
@@ -40,12 +43,13 @@ export function readFeedQuery(params: SearchParams): FeedQuery | null {
         category.length > 255))
   )
     return null;
-  return { page, sort, category, view };
+  return { page, sort, category, view, q: q?.trim() || undefined };
 }
 
 export function feedHref(query: Partial<FeedQuery> = {}): string {
   const params = new URLSearchParams();
   if (query.category) params.set("category", query.category);
+  if (query.q) params.set("q", query.q);
   if (query.sort && query.sort !== "newest") params.set("sort", query.sort);
   if (query.page && query.page > 1) params.set("page", String(query.page));
   if (query.view) params.set("view", query.view);

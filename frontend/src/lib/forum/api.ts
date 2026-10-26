@@ -33,6 +33,7 @@ export function getDiscussions(
     pageSize: String(pageSize),
   });
   if (query.category) params.set("category", query.category);
+  if (query.q) params.set("q", query.q);
   return strapiRequest(`/discussions?${params}`);
 }
 
