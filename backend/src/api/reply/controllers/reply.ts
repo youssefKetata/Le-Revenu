@@ -1,9 +1,17 @@
 import type { Core } from '@strapi/strapi';
 import type { Context } from 'koa';
 import { allowQuery, pageQuery, readDocumentId } from '../../../utils/read-query';
-import { replyInput } from '../../../utils/publish-input';
+import { replyInput, usefulInput } from '../../../utils/publish-input';
 
 export default ({ strapi }: { strapi: Core.Strapi }) => ({
+  async useful(ctx: Context) {
+    allowQuery(ctx.query, []);
+    const discussion = readDocumentId(ctx.params.documentId, 'discussion');
+    const reply = readDocumentId(ctx.params.replyId, 'reply');
+    const useful = usefulInput(ctx.request.body);
+    ctx.set('Cache-Control', 'no-store');
+    return strapi.service('api::reply.reply').setUseful(ctx.state.user.documentId, discussion, reply, useful);
+  },
   async create(ctx: Context) {
     allowQuery(ctx.query, []);
     const discussion = readDocumentId(ctx.params.documentId, 'discussion');
@@ -17,6 +25,6 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     const query = pageQuery(ctx.query);
     const documentId = readDocumentId(ctx.params.documentId);
     ctx.set('Cache-Control', 'no-store');
-    return strapi.service('api::reply.reply').findPage(documentId, query);
+    return strapi.service('api::reply.reply').findPage(documentId, query, ctx.state.user?.documentId);
   },
 });

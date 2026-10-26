@@ -10,6 +10,8 @@ const memberActions = [
   ...readActions,
   'api::discussion.discussion.create',
   'api::reply.reply.create',
+  'api::reply.reply.useful',
+  'api::discussion.discussion.bestAnswer',
   'plugin::users-permissions.user.me',
   'plugin::users-permissions.auth.logout',
 ];

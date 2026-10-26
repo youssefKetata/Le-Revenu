@@ -505,6 +505,7 @@ export interface ApiDiscussionDiscussion extends Struct.CollectionTypeSchema {
       'plugin::users-permissions.user'
     > &
       Schema.Attribute.Required;
+    bestAnswer: Schema.Attribute.Relation<'oneToOne', 'api::reply.reply'>;
     category: Schema.Attribute.Relation<'manyToOne', 'api::category.category'> &
       Schema.Attribute.Required;
     content: Schema.Attribute.Text &
@@ -574,6 +575,11 @@ export interface ApiReplyReply extends Struct.CollectionTypeSchema {
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    usefulVoters: Schema.Attribute.Relation<
+      'manyToMany',
+      'plugin::users-permissions.user'
+    > &
       Schema.Attribute.Private;
   };
 }

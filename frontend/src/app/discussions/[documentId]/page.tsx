@@ -9,6 +9,7 @@ import {
   DiscussionType,
 } from "@/components/forum/category-tag";
 import ReplyList from "@/components/forum/reply-list";
+import { ClearBestAnswer } from "@/components/forum/reply-actions";
 import CopyLink from "@/components/forum/copy-link";
 import { ButtonLink, buttonClassName } from "@/components/ui/button";
 import Card from "@/components/ui/card";
@@ -70,6 +71,9 @@ export default async function DiscussionPage({
     );
   }
   const { discussion, replies } = thread;
+  const canChoose = discussion.type === "question" && Boolean(session.member)
+    && session.member?.documentId === discussion.author?.documentId;
+  const bestAnswerOnPage = replies.data.some((reply) => reply.documentId === discussion.bestAnswerId);
   const category = categories.find(
     (item) => item.documentId === discussion.category?.documentId,
   );
@@ -144,7 +148,41 @@ export default async function DiscussionPage({
               ? `${replies.meta.pagination.total} ${replies.meta.pagination.total === 1 ? "réponse" : "réponses"}`
               : "Aucune réponse pour l’instant"}
           </h2>
-          <ReplyList documentId={documentId} replies={replies} />
+          {discussion.bestAnswer && !bestAnswerOnPage && (
+            <Card
+              as="article"
+              id={`reply-${discussion.bestAnswer.documentId}`}
+              aria-label="Meilleure réponse"
+              className="border-success/40"
+            >
+              <h3 className="mb-3 flex items-center gap-2 font-semibold text-success">
+                <Icon name="check" /> Meilleure réponse
+              </h3>
+              <Byline
+                author={discussion.bestAnswer.author}
+                createdAt={discussion.bestAnswer.createdAt}
+                variant="reply"
+              />
+              <p className="mt-2.5 text-[15.5px] leading-[1.7] whitespace-pre-wrap wrap-anywhere">
+                {discussion.bestAnswer.content}
+              </p>
+              <p className="mt-3 text-xs text-muted">Choisie par l’auteur de la question.</p>
+              {canChoose && (
+                <ClearBestAnswer
+                  discussionId={documentId}
+                  replyId={discussion.bestAnswer.documentId}
+                  page={replies.meta.pagination.page}
+                />
+              )}
+            </Card>
+          )}
+          <ReplyList
+            documentId={documentId}
+            replies={replies}
+            memberId={session.member?.documentId}
+            canChoose={canChoose}
+            bestAnswerId={discussion.bestAnswerId}
+          />
           <Card padding="none">
             {session.member ? (
               <ReplyForm

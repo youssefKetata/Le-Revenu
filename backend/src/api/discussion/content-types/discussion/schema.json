@@ -42,6 +42,11 @@
       "inversedBy": "discussions",
       "required": true
     },
+    "bestAnswer": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::reply.reply"
+    },
     "replies": {
       "type": "relation",
       "relation": "oneToMany",

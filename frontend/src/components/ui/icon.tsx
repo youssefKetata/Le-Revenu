@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 const paths = {
+  thumb: <path d="M7 10v11H3V10h4Zm0 1 5-9a3 3 0 0 1 2 4l-1 4h6a2 2 0 0 1 2 2l-2 7a3 3 0 0 1-3 2H7" />,
   home: (
     <>
       <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />

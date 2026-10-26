@@ -31,6 +31,7 @@ export default function DiscussionCard({
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
             <CategoryTag category={discussion.category} />
             <span>{discussion.author?.username ?? "Membre supprimé"}</span>
+            {discussion.bestAnswerId && <span className="text-success">Résolue</span>}
           </div>
         </div>
         <strong
@@ -62,6 +63,7 @@ export default function DiscussionCard({
         <div className="mb-[5px] flex flex-wrap items-center gap-2">
           <CategoryTag category={discussion.category} />
           <DiscussionType type={discussion.type} />
+          {discussion.bestAnswerId && <span className="inline-flex items-center gap-1 text-xs font-semibold text-success"><Icon name="check" /> Résolue</span>}
         </div>
         <h2 className="font-serif text-[18.5px] leading-[1.3] font-bold tracking-[-.01em] wrap-anywhere">
           <Link

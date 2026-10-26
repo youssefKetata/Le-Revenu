@@ -24,6 +24,12 @@
       "inversedBy": "replies",
       "required": true
     },
+    "usefulVoters": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "private": true
+    },
     "discussion": {
       "type": "relation",
       "relation": "manyToOne",

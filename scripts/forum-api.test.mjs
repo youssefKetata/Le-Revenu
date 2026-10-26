@@ -84,7 +84,7 @@ test('forum integration', { timeout: 90_000 }, async t => {
         try { result = await request(`/api/discussions?pageSize=${pageSize}`); }
         finally { app.db.connection.removeListener('query', collect); }
         assert.equal(result.status, 200);
-        const replyQueries = sql.filter(query => query.includes('"replies"'));
+        const replyQueries = sql.filter(query => query.includes('"replies"') && /count\(\*\)/i.test(query));
         assert.equal(replyQueries.length, 1);
         assert.match(replyQueries[0], /count\(\*\).*group by/is);
         return { ...result, queries: sql.length };
@@ -162,6 +162,98 @@ test('forum integration', { timeout: 90_000 }, async t => {
       assert.equal((await request(`/api/discussions/${publishedId}/replies`)).body.data[0].documentId, reply.body.data.documentId);
     });
 
+    await t.test('useful votes are private, removable, idempotent and authorized', async () => {
+      const discussion = ids[0], reply = fixtures.demoReplies[0].documentId;
+      const path = `/api/discussions/${discussion}/replies/${reply}/useful`;
+      const vote = (useful, token = firstToken) => request(path, post({ data: { useful } }, token));
+      for (const token of [undefined, 'forged-token']) {
+        assert.equal((await request(path, post({ data: { useful: true } }, token))).status, token ? 401 : 403);
+      }
+      assert.equal((await vote(true, secondToken)).status, 403, 'self voting is forbidden');
+      for (const data of [{}, { useful: 'true' }, { useful: true, author: fixtures.demoUsers[1].documentId }]) {
+        assert.equal((await request(path, post({ data }, firstToken))).status, 400);
+      }
+      assert.equal((await request(`/api/discussions/${ids[1]}/replies/${reply}/useful`, post({ data: { useful: true } }, firstToken))).status, 404);
+      assert.equal((await request(`/api/discussions/${discussion}/replies/${'z'.repeat(24)}/useful`, post({ data: { useful: true } }, firstToken))).status, 404);
+      const attempts = await Promise.all([vote(true), vote(true), vote(true)]);
+      attempts.forEach(result => {
+        assert.equal(result.status, 200);
+        assert.equal(result.body.data.usefulCount, 1);
+        assert.equal(result.body.data.hasVoted, true);
+        assert.equal('usefulVoters' in result.body.data, false);
+      });
+      const anonymous = await request(`/api/discussions/${discussion}/replies`);
+      const member = await request(`/api/discussions/${discussion}/replies`, { headers: { Authorization: `Bearer ${firstToken}` } });
+      const other = await request(`/api/discussions/${discussion}/replies`, { headers: { Authorization: `Bearer ${secondToken}` } });
+      assert.equal(anonymous.body.data[0].usefulCount, 1);
+      assert.equal(anonymous.body.data[0].hasVoted, false);
+      assert.equal(member.body.data[0].hasVoted, true);
+      assert.equal(other.body.data[0].hasVoted, false);
+      assert.deepEqual(Object.keys(member.body.data[0]).sort(), ['author', 'content', 'createdAt', 'documentId', 'hasVoted', 'usefulCount']);
+      for (let i = 0; i < 2; i++) {
+        const removed = await vote(false);
+        assert.equal(removed.status, 200);
+        assert.equal(removed.body.data.usefulCount, 0);
+        assert.equal(removed.body.data.hasVoted, false);
+      }
+      // Two distinct members can vote; removing one leaves the other vote intact.
+      const role = await app.db.query('plugin::users-permissions.role').findOne({ where: { type: 'authenticated' } });
+      const password = randomBytes(24).toString('hex');
+      await app.plugin('users-permissions').service('user').add({
+        username: 'third_voter', email: 'third@example.test', password,
+        provider: 'local', confirmed: true, blocked: false, role: role.id,
+      });
+      const login = await request('/api/auth/local', post({ identifier: 'third_voter', password }));
+      assert.equal(login.status, 200);
+      assert.equal((await vote(true)).body.data.usefulCount, 1);
+      assert.equal((await vote(true, login.body.jwt)).body.data.usefulCount, 2);
+      assert.equal((await vote(false)).body.data.usefulCount, 1);
+      assert.equal((await vote(false, login.body.jwt)).body.data.usefulCount, 0);
+    });
+
+    await t.test('only question owners can choose, replace or clear a related best answer', async () => {
+      const path = `/api/discussions/${ids[0]}/best-answer`;
+      const reply = fixtures.demoReplies[0].documentId;
+      const choose = (value, token = firstToken) => request(path, post({ data: { reply: value } }, token));
+      assert.equal((await request(path, post({ data: { reply } }))).status, 403);
+      assert.equal((await choose(reply, secondToken)).status, 403);
+      assert.equal((await choose(null, secondToken)).status, 403);
+      assert.equal((await choose(fixtures.demoReplies[1].documentId)).status, 403, 'cannot accept own reply');
+      assert.equal((await choose(fixtures.demoReplies[2].documentId)).status, 404, 'cross-question reply');
+      assert.equal((await choose('z'.repeat(24))).status, 404);
+      assert.equal((await choose('invalid')).status, 400);
+      assert.equal((await request(path, post({ data: { reply, author: fixtures.demoUsers[1].documentId } }, firstToken))).status, 400);
+      assert.equal((await request(`/api/discussions/${ids[2]}/best-answer`, post({ data: { reply: fixtures.demoReplies[3].documentId } }, firstToken))).status, 400, 'ordinary discussions cannot be resolved');
+      assert.equal((await request(`/api/discussions/${'z'.repeat(24)}/best-answer`, post({ data: { reply } }, firstToken))).status, 404);
+      assert.equal((await choose(reply)).status, 200);
+      assert.equal((await choose(reply)).status, 200, 'repeated selection is idempotent');
+      const selected = await request(`/api/discussions/${ids[0]}`);
+      assert.equal(selected.body.data.bestAnswerId, reply);
+      assert.equal(selected.body.data.bestAnswer.content, fixtures.demoReplies[0].content);
+      assert.deepEqual(Object.keys(selected.body.data.bestAnswer.author).sort(), ['documentId', 'username']);
+      assert.equal((await request('/api/discussions?category=bourse')).body.data.find(row => row.documentId === ids[0]).bestAnswerId, reply);
+      const replacement = await request(`/api/discussions/${ids[0]}/replies`, post({ data: { content: 'A second eligible answer.' } }, secondToken));
+      assert.equal(replacement.status, 201);
+      assert.equal((await choose(replacement.body.data.documentId)).status, 200);
+      // The selected answer is returned in detail even when absent from the requested reply page.
+      const firstPage = await request(`/api/discussions/${ids[0]}/replies?pageSize=1`);
+      assert.equal(firstPage.body.data.length, 1);
+      assert.notEqual(firstPage.body.data[0].documentId, replacement.body.data.documentId);
+      assert.equal((await request(`/api/discussions/${ids[0]}`)).body.data.bestAnswer.documentId, replacement.body.data.documentId);
+      const concurrent = await Promise.all([choose(reply), choose(replacement.body.data.documentId)]);
+      concurrent.forEach(result => assert.equal(result.status, 200));
+      assert.ok([reply, replacement.body.data.documentId].includes((await request(`/api/discussions/${ids[0]}`)).body.data.bestAnswerId));
+      assert.equal((await choose(replacement.body.data.documentId)).status, 200);
+      await app.documents('api::reply.reply').delete({ documentId: replacement.body.data.documentId });
+      assert.equal((await request(`/api/discussions/${ids[0]}`)).body.data.bestAnswer, null, 'admin deletion removes the selected relation');
+      assert.equal((await choose(reply)).status, 200);
+      assert.equal((await choose(null)).status, 200);
+      assert.equal((await choose(null)).status, 200);
+      const cleared = await request(`/api/discussions/${ids[0]}`);
+      assert.equal(cleared.body.data.bestAnswerId, null);
+      assert.equal(cleared.body.data.bestAnswer, null);
+    });
+
     await t.test('anonymous/forged requests, invalid input and author spoofing cannot write', async () => {
       const before = await counts();
       for (const token of [undefined, 'forged-token']) {
@@ -185,17 +277,30 @@ test('forum integration', { timeout: 90_000 }, async t => {
       const jwt = require('jsonwebtoken');
       const expired = jwt.sign({ ...jwt.decode(firstToken), exp: Math.floor(Date.now() / 1000) - 1 }, app.config.get('plugin::users-permissions.jwtSecret'));
       assert.equal((await request('/api/discussions', post({ data: valid }, expired))).status, 401);
+      const usefulPath = `/api/discussions/${ids[0]}/replies/${fixtures.demoReplies[0].documentId}/useful`;
+      const bestPath = `/api/discussions/${ids[0]}/best-answer`;
+      assert.equal((await request(usefulPath, post({ data: { useful: true } }, expired))).status, 401);
+      assert.equal((await request(bestPath, post({ data: { reply: null } }, expired))).status, 401);
       const users = app.db.query('plugin::users-permissions.user');
       await users.update({ where: { documentId: fixtures.demoUsers[1].documentId }, data: { blocked: true } });
       assert.equal((await request('/api/discussions', post({ data: valid }, secondToken))).status, 401);
+      assert.equal((await request(bestPath, post({ data: { reply: null } }, secondToken))).status, 401);
       await users.update({ where: { documentId: fixtures.demoUsers[1].documentId }, data: { blocked: false } });
       const role = await app.db.query('plugin::users-permissions.role').findOne({ where: { type: 'authenticated' } });
       await app.db.query('plugin::users-permissions.permission').delete({ where: { role: { id: role.id }, action: 'api::discussion.discussion.create' } });
       assert.equal((await request('/api/discussions', post({ data: valid }, secondToken))).status, 403);
+      for (const action of ['api::reply.reply.useful', 'api::discussion.discussion.bestAnswer']) {
+        await app.db.query('plugin::users-permissions.permission').delete({ where: { role: { id: role.id }, action } });
+      }
+      assert.equal((await request(usefulPath, post({ data: { useful: true } }, firstToken))).status, 403);
+      assert.equal((await request(bestPath, post({ data: { reply: null } }, firstToken))).status, 403);
       await configureForumPermissions(app);
       assert.equal((await request('/api/auth/logout', post({}, firstToken))).status, 200);
       assert.equal((await request('/api/users/me', { headers: { Authorization: `Bearer ${firstToken}` } })).status, 401);
       assert.equal((await request('/api/discussions', post({ data: valid }, firstToken))).status, 401);
+      assert.equal((await request(usefulPath, post({ data: { useful: true } }, firstToken))).status, 401);
+      assert.equal((await request(bestPath, post({ data: { reply: null } }, firstToken))).status, 401);
+      assert.equal((await request(`/api/discussions/${ids[0]}/replies`, { headers: { Authorization: `Bearer ${firstToken}` } })).status, 401);
       assert.equal((await request(`/api/discussions/${publishedId}/replies`, post({ data: { content: 'reply' } }, firstToken))).status, 401);
       assert.equal((await request('/api/users/me', { headers: { Authorization: `Bearer ${secondToken}` } })).status, 200);
       assert.deepEqual(await counts(), before);

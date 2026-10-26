@@ -104,19 +104,35 @@ test("search renders filtered API results and keeps search in navigation", async
 });
 
 test("detail renders persisted content/replies, offers login and handles missing discussions", async () => {
-  const feed = await api("/discussions?pageSize=1");
-  const id = feed.data[0].documentId;
+  const feed = await api("/discussions?pageSize=20");
+  const withReplies = feed.data.find((item) => item.bestAnswerId)
+    ?? feed.data.find((item) => item.replyCount > 0);
+  assert.ok(withReplies, "Seeded discussions include replies for rendering checks.");
+  const id = withReplies.documentId;
   const [{ data: discussion }, { data: replies }] = await Promise.all([
     api(`/discussions/${id}`),
     api(`/discussions/${id}/replies?pageSize=20`),
   ]);
   const html = await page(`/discussions/${id}`);
+  const renderedHtml = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, "").replace(/<!--[\s\S]*?-->/g, "");
   assert.ok(html.includes(escapeHtml(discussion.title)));
   assert.ok(html.includes(escapeHtml(discussion.content)));
   replies.forEach((reply) => {
     assert.ok(html.includes(`id="reply-${reply.documentId}"`));
     assert.ok(html.includes(escapeHtml(reply.content)));
+    assert.ok(renderedHtml.includes(`Utile (${reply.usefulCount})`));
   });
+  if (replies.length) assert.ok(html.includes("Se connecter pour voter"));
+  assert.ok(!html.includes('value="accept"'));
+  if (discussion.bestAnswer) {
+    assert.ok(html.includes("Meilleure réponse"));
+    assert.ok(html.includes(escapeHtml(discussion.bestAnswer.content)));
+    const replyIds = [...renderedHtml.matchAll(/id="reply-([a-z0-9]{24})"/g)].map(match => match[1]);
+    assert.equal(replyIds.filter(id => id === discussion.bestAnswerId).length, 1,
+      "The selected answer is rendered once, including when it is on the current reply page.");
+    if (replies.some(reply => reply.documentId === discussion.bestAnswerId))
+      assert.equal(replyIds[0], discussion.bestAnswerId, "The selected reply appears first with its actions.");
+  }
   assert.ok(html.includes("Se connecter pour répondre"));
   assert.ok(
     html.includes(

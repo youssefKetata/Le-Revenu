@@ -7,9 +7,10 @@ const populate = {
   author: { fields: ['username'] },
   category: { fields: ['name', 'slug', 'icon', 'color'] },
   replies: { count: true },
+  bestAnswer: { fields: ['documentId'] },
 } satisfies Modules.Documents.Params.Populate.Any<'api::discussion.discussion'>;
 
-type SummaryRow = Data.ContentType<'api::discussion.discussion', 'title' | 'type' | 'createdAt' | 'author' | 'category'> & { replies?: unknown };
+type SummaryRow = Data.ContentType<'api::discussion.discussion', 'title' | 'type' | 'createdAt' | 'author' | 'category' | 'bestAnswer'> & { replies?: unknown };
 
 function excerpt(content: string) { return content.slice(0, 220).replace(/[\uD800-\uDBFF]$/, '').replace(/\s+/g, ' ').trim(); }
 
@@ -23,10 +24,35 @@ function summary(row: SummaryRow, preview: string) {
     } : null,
     // Strapi's result typings do not represent count-only relation population.
     replyCount: (row.replies as { count: number }).count,
+    bestAnswerId: row.bestAnswer?.documentId ?? null,
   };
 }
 
 export default ({ strapi }: { strapi: Core.Strapi }) => ({
+  async setBestAnswer(member: string, documentId: string, replyId: string | null) {
+    return strapi.db.transaction(async ({ trx }) => {
+      // A single relation plus this row lock serializes competing selections.
+      const { tableName, attributes } = strapi.db.metadata.get('api::discussion.discussion');
+      const field = attributes.documentId;
+      if (!('columnName' in field) || !field.columnName) throw new Error('Discussion column metadata is missing.');
+      await strapi.db.getConnection(tableName).select('id').where(field.columnName, documentId).transacting(trx).forUpdate().first();
+      const documents = strapi.documents('api::discussion.discussion');
+      const discussion = await documents.findOne({ documentId, fields: ['type'], populate: { author: { fields: ['username'] } } });
+      if (!discussion) throw new errors.NotFoundError('Discussion not found.');
+      if (discussion.author?.documentId !== member) throw new errors.ForbiddenError('Only the question author can choose its best answer.');
+      if (discussion.type !== 'question') throw new errors.ValidationError('Only questions can have a best answer.');
+      if (replyId) {
+        const reply = await strapi.documents('api::reply.reply').findOne({
+          documentId: replyId, fields: ['content'],
+          populate: { discussion: { fields: ['title'] }, author: { fields: ['username'] } },
+        });
+        if (!reply || reply.discussion?.documentId !== documentId) throw new errors.NotFoundError('Reply not found in this question.');
+        if (reply.author?.documentId === member) throw new errors.ForbiddenError('You cannot select your own reply.');
+      }
+      await documents.update({ documentId, data: { bestAnswer: replyId }, fields: ['title'] });
+      return { data: { bestAnswerId: replyId }, meta: {} };
+    });
+  },
   async publish(author: string, input: DiscussionInput) {
     return strapi.db.transaction(async () => {
       const category = await strapi.documents('api::category.category').findOne({
@@ -38,7 +64,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         fields: ['title', 'content', 'type', 'createdAt'],
         populate,
       });
-      return { data: { ...summary(row, excerpt(row.content!)), content: row.content }, meta: {} };
+      return { data: { ...summary(row, excerpt(row.content!)), content: row.content, bestAnswer: null }, meta: {} };
     });
   },
   async findPage(page: FeedQuery) {
@@ -76,9 +102,19 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     const row = await strapi.documents('api::discussion.discussion').findOne({
       documentId,
       fields: ['title', 'content', 'type', 'createdAt'],
-      populate,
+      populate: {
+        ...populate,
+        bestAnswer: { fields: ['content', 'createdAt'], populate: { author: { fields: ['username'] } } },
+      },
     });
     if (!row) throw new errors.NotFoundError('Discussion not found.');
-    return { data: { ...summary(row, excerpt(row.content!)), content: row.content }, meta: {} };
+    const best = row.bestAnswer;
+    return { data: {
+      ...summary(row, excerpt(row.content!)), content: row.content,
+      bestAnswer: best ? {
+        documentId: best.documentId, content: best.content, createdAt: best.createdAt,
+        author: best.author ? { documentId: best.author.documentId, username: best.author.username } : null,
+      } : null,
+    }, meta: {} };
   },
 });

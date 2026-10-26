@@ -4,7 +4,7 @@ Technical assignment: a community forum built with Next.js App Router, React, Ty
 
 ## Current scope
 
-Phases 1–4 are implemented, with the v2 UI and approved discussion-search bonus: live feeds, category filters, date sorting, detailed/compact views, discussion/reply pages, and shadcn/ui login/publishing dialogs with standalone URLs. The HTTP journey and focused rendering tests pass. See the [implementation plan](IMPLEMENTATION_PLAN.md).
+Phases 1–4 are implemented, with the v2 UI and discussion-search, useful-vote and best-answer bonuses: live feeds, category filters, date sorting, detailed/compact views, discussion/reply pages, and shadcn/ui login/publishing dialogs with standalone URLs. See the [implementation plan](IMPLEMENTATION_PLAN.md).
 
 ```text
 frontend/                 Next.js application
@@ -123,8 +123,8 @@ The versioned schemas live under `backend/src/api/<name>/content-types/<name>/sc
 | Collection | Fields and relationships |
 | --- | --- |
 | Category | Required name and unique slug (generated from the name); optional description, icon key and six-digit hex color; many discussions |
-| Discussion | Required title (10-255 characters), plain-text content and type (`question` or `discussion`); one author, one category and many replies |
-| Reply | Required plain-text content; one author and one discussion |
+| Discussion | Required title (10-255 characters), plain-text content and type (`question` or `discussion`); one author, one category, many replies and an optional best-answer relation |
+| Reply | Required plain-text content; one author, one discussion and a many-to-many useful-voters relation |
 | User | Native Users & Permissions user, extended with many discussions and replies |
 
 `backend/src/extensions/users-permissions/strapi-server.ts` adds the inverse author relationships while preserving the plugin's native authentication fields. Forum members are distinct from Strapi administrators.
@@ -154,7 +154,7 @@ Example: `http://127.0.0.1:1337/api/discussions?category=bourse&sort=newest&page
 
 Lists return `{ data: [...], meta: { pagination: { page, pageSize, pageCount, total } } }`. Detail returns `{ data: { ... }, meta: {} }`. Pagination defaults to page 1 and 25 records, allows at most 100 records per page, and rejects offsets above 100,000. Valid pages beyond the last page return an empty list with the matching total; unknown category slugs return an empty list. Dates use `createdAt`, with `documentId` as a stable tie-breaker. Categories are sorted by name.
 
-The feed returns `documentId`, `title`, `excerpt`, `type`, `createdAt`, `author`, `category` and `replyCount`. The plain-text excerpt is at most 220 UTF-16 code units, with whitespace collapsed. Strapi projects bounded text previews in one additional batched database query for the current page; it does not transfer full bodies or issue a query per card. Only detail includes discussion `content`. Replies return `documentId`, `content`, `createdAt` and `author`. Author projections contain only `documentId` and `username`; user emails, credentials, roles and tokens are never included. Deleted authors or categories are represented by `null`. Numeric database IDs are not part of this API contract.
+The feed returns `documentId`, `title`, `excerpt`, `type`, `createdAt`, `author`, `category`, `replyCount` and `bestAnswerId`. The plain-text excerpt is at most 220 UTF-16 code units, with whitespace collapsed. Strapi projects bounded text previews in one additional batched database query for the current page; it does not transfer full bodies or issue a query per card. Only detail includes discussion `content` and the selected `bestAnswer` with its public content/byline. Replies return `documentId`, `content`, `createdAt`, `author`, `usefulCount` and `hasVoted`. Author projections contain only `documentId` and `username`; user emails, credentials, roles, tokens and voter identities are never included. Deleted authors or categories are represented by `null`. Numeric database IDs are not part of this API contract.
 
 Queries fetch explicit fields and relations through Strapi's Document Service. Reply counts use Strapi's count-only relation population, which runs one grouped count for the page instead of fetching reply bodies or counting each discussion separately. Replies are fetched and paginated independently. Reads send `Cache-Control: no-store` so dashboard edits appear on the next request.
 
@@ -164,7 +164,7 @@ This is substring search for the assignment's dataset. It adds no per-result que
 
 Invalid numbers, malformed document IDs, repeated/structured or overlong search values and unsupported query options return HTTP 400. Missing discussions return HTTP 404, including on the replies route. Arbitrary `fields`, `populate` and `filters` are not accepted by this focused API.
 
-`backend/src/permissions/forum.ts` runs at startup and reproducibly grants these four read actions to Public and Authenticated members. Authenticated members also receive discussion/reply creation, current-user and logout permissions. Other forum actions and user-directory/management endpoints remain forbidden; dashboard administrator permissions are separate. Self-registration is disabled because this project uses seeded members. Code owns these settings, so changing forum permissions only in the dashboard is not a persistent configuration change.
+`backend/src/permissions/forum.ts` runs at startup and reproducibly grants these four read actions to Public and Authenticated members. Authenticated members also receive discussion/reply creation, useful-vote, best-answer, current-user and logout permissions. Other forum actions and user-directory/management endpoints remain forbidden; dashboard administrator permissions are separate. Self-registration is disabled because this project uses seeded members. Code owns these settings, so changing forum permissions only in the dashboard is not a persistent configuration change.
 
 ## Login, logout and secure publishing
 
@@ -189,6 +189,23 @@ Strapi trims title/content before validation and storage. Titles must contain 10
 
 Anonymous writes are rejected with HTTP 403; forged/expired/revoked sessions with HTTP 401; invalid input with HTTP 400 and field details; missing related documents with HTTP 404. Members without the relevant create permission cannot publish. Category management, discussion updates and deletion are not exposed as member operations. Each publication uses a Strapi database transaction; replies and reply counts are available on the next uncached read.
 
+## Useful votes and best answers
+
+Members can mark another member's reply as useful and remove their own vote. Counts are public; voter identities are never returned. The reply list includes `usefulCount` and `hasVoted` (false for anonymous visitors). Authenticated reads require an active session and resolve only the current member's votes in one additional batched query for the page. Count-only relation population avoids loading the voter list.
+
+Only a question's author can choose, replace or clear its best answer. The selected reply must belong to that question and be authored by another member. Ordinary discussions cannot have best answers. Detail returns the selected reply's public content/byline in `bestAnswer`, independently of reply pagination; feeds expose only `bestAnswerId` and show a resolved badge. The author can clear the selection from the pinned answer even if its original reply is on another page.
+
+| Method and path | Required JSON body |
+| --- | --- |
+| `POST /discussions/:documentId/replies/:replyId/useful` | `{ "data": { "useful": true } }` (use `false` to remove) |
+| `POST /discussions/:documentId/best-answer` | `{ "data": { "reply": "<reply documentId>" } }` (use `null` to clear) |
+
+Both endpoints require the member's access token and return HTTP 200 with `{ data: { ... }, meta: {} }`. Input allowlists reject author overrides and unknown fields. The useful response contains the safe updated reply, count and current member's state; the best-answer response contains `bestAnswerId`. Permissions and active-session checks apply independently of the UI. Self-votes, self-acceptance and non-owner selections return 403; invalid input/non-question selection returns 400; missing or cross-question replies return 404.
+
+Votes use a native Strapi many-to-many relation; best answers use a single optional one-to-one relation. Writes use the Document Service inside Strapi transactions. A row lock serializes writes to the same reply/question, and explicit add/remove or select/clear operations make retries idempotent. There are no separate stored counters or external services. These additive schema changes synchronize on Strapi startup; regenerate backend types after schema edits. Existing seed data and existing member accounts are preserved.
+
+Next.js Server Actions forward only the intended state. With JavaScript, votes use React `useOptimistic`: the button state and count update immediately, stay pending during the request, and reconcile with fresh Strapi data without navigation or moving focus. Failed requests roll back to the confirmed state and show feedback; expired sessions offer reconnection. A per-reply guard blocks duplicate submissions while saving. Without JavaScript, the same vote form uses the native Server Action and redirects to the reply after success. Best-answer changes revalidate the feed/thread and redirect to the same reply page's reply section. Reloads read persisted counts and selections. The integration suite covers duplicate/concurrent votes, independent member votes, removal, invalid and cross-question input, replacement/clearing, public field privacy and revoked/underprivileged sessions.
+
 ## Checks and production-mode startup
 
 Run checks and builds sequentially on an 8 GB machine:
@@ -197,6 +214,7 @@ Run checks and builds sequentially on an 8 GB machine:
 npm run lint:frontend
 npm run typecheck:frontend
 npm run typecheck:backend
+npm run test:ui
 npm run test:api
 npm run build:backend
 npm run build:frontend
@@ -225,6 +243,7 @@ Use a new terminal for `dev:backend`, or set `$env:NODE_ENV = 'development'` whe
 - `STRAPI_URL` is server-side configuration. Never place database credentials or privileged Strapi tokens in `NEXT_PUBLIC_*` variables.
 - Playfair Display bold and Inter are served locally from `frontend/public/fonts/`, with their Open Font Licenses included. Startup and builds do not download fonts. Body text follows the mockup's system-font/Inter stack.
 - Dependencies for the two applications are installed separately, with their own lockfiles; Strapi's admin React version is independent from the Next.js frontend.
+- Frontend test-only dependencies: esbuild compiles JSX for the existing Node test runner; jsdom provides a DOM for optimistic interaction tests. They add no application runtime dependency.
 - Strapi content-type schemas will be committed to Git. Its application database tables are initialized through Strapi; no hand-written forum SQL schema is used.
 
 ## Phase 1 verification
@@ -251,17 +270,19 @@ Verified against the configured local PostgreSQL database:
 
 ## Verification
 
-Run the backend integration suite with:
+Stop the backend development server before running the integration suite: both compile into `backend/dist`.
 
 ```powershell
 npm run test:api
 ```
 
-The suite starts real Strapi HTTP endpoints in an isolated PostgreSQL schema and removes that schema in cleanup. The configured database role must be able to create schemas. Six focused scenarios cover:
+The suite starts real Strapi HTTP endpoints in an isolated PostgreSQL schema and removes that schema in cleanup. The configured database role must be able to create schemas. Eight focused scenarios cover:
 
 - Fresh demo seeding and reruns that preserve edited content and password hashes.
 - Safe feed fields, filtering, sorting, pagination and one grouped reply-count query per page.
 - Title/content search, literal wildcard handling, input bounds and combined category/sort/pagination.
+- Useful votes: self-vote rejection, idempotent retries/concurrency, independent member votes, removal and private voter state.
+- Best answers: question ownership, reply membership, replacement/clearing, concurrency and pagination-independent detail.
 - Native login and persistent discussion/reply creation with authenticated authors.
 - Validation, missing relations, anonymous/forged requests and author-spoofing protection.
 - Expired, blocked, underprivileged and logged-out sessions being unable to publish.
@@ -280,6 +301,10 @@ For the v2 changes, the five backend scenarios, two frontend rendering scenarios
 
 After adding discussion search, all six backend scenarios and three frontend rendering scenarios pass, along with frontend/backend TypeScript, frontend lint and the frontend production build. Browser checks cover Enter submission, category/date-order preservation, inline length errors, empty results, clearing, browser Back and reload. Desktop and 390 × 844 mobile layouts were checked; no browser console warnings/errors were reported.
 
+After adding useful votes and best answers, all eight backend scenarios and three frontend rendering scenarios pass, together with lint, frontend/backend TypeScript and both production builds. Authenticated native HTTP form checks against the production frontend verify voting, reload, selection, clearing the pinned answer from another reply page, and page-preserving success redirects. Original demo votes/selections are restored and the test session revoked afterward. Desktop/mobile browser checks verify the public count and pinned-answer layout; no browser console warnings/errors were reported.
+
+The three component scenarios in `npm run test:ui` run without application servers. They verify immediate vote/unvote feedback before a deferred request completes, duplicate-submission protection, rebasing on a changed server count without double-counting, session-error rollback/reconnection, and network-error rollback/retry. Enhanced Server Action HTTP checks against the production frontend also verify vote/unvote completion without redirects, invalid input, revoked sessions and the native-form fallback. Temporary demo vote changes are restored afterward.
+
 ## Frontend journey and rendering
 
 - `/` renders live, paginated discussions through Server Components. `q`, `category`, `sort`, `page` and compact `view` stay in the URL; searching/filtering/sorting reset to page one. Search and filter/sort/view navigation also work without client JavaScript.
@@ -293,7 +318,7 @@ Frontend structure is organized by responsibility: `components/ui/` contains sha
 
 Ordinary component styles use Tailwind utilities and shared controls. Light/dark tokens live in `frontend/src/styles/theme.css`; global CSS is limited to font loading, Tailwind aliases and base rules. Small colocated CSS Modules handle layered gradients. The shared shadcn/ui Dialog uses Radix and `tw-animate-css` for accessible animated overlays. Login/publishing use Next.js intercepted routes on client navigation and standalone pages on direct visits. Expected service failures have explicit feedback; unexpected code errors reach the route error boundary. Backend structure stays within Strapi's native controllers/services/policies conventions, with no extra repository layer or parallel Next.js business backend.
 
-The current visual reference is `maquette-communaute-le-revenu-v2.html`. Discussion search is implemented as an approved PDF bonus. Its unsupported polls/votes, best answers, notifications, profiles/points, blogs, events and editorial tools remain excluded. Metrics and content come from Strapi. Authentication uses community demo accounts rather than lerevenu.com SSO, and discussion content remains mandatory as required by the PDF. The spaces and charter links have real pages; the top external editorial links retain the mockup's lerevenu.com destination.
+The current visual reference is `maquette-communaute-le-revenu-v2.html`. Discussion search, useful reply votes and best answers are implemented PDF bonuses. Polls, notifications, profiles/points, blogs, events and editorial tools remain excluded. Metrics and content come from Strapi. Authentication uses community demo accounts rather than lerevenu.com SSO, and discussion content remains mandatory as required by the PDF. The spaces and charter links have real pages; the top external editorial links retain the mockup's lerevenu.com destination.
 
 ## Source material
 

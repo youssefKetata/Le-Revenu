@@ -1,5 +1,6 @@
 import "server-only";
 import { strapiRequest } from "@/lib/strapi";
+import { getSession, sessionToken } from "@/lib/session";
 import { lastPage, pageSize, type FeedQuery } from "@/lib/forum/query";
 import type {
   Category,
@@ -44,12 +45,14 @@ export async function getDiscussion(documentId: string): Promise<Discussion> {
   return result.data;
 }
 
-export function getReplies(
+export async function getReplies(
   documentId: string,
   page: number,
 ): Promise<Collection<Reply>> {
+  const { member } = await getSession();
   return strapiRequest(
     `/discussions/${encodeURIComponent(documentId)}/replies?page=${page}&pageSize=${pageSize}`,
+    { token: member ? await sessionToken() : undefined },
   );
 }
 

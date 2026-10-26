@@ -1,9 +1,16 @@
 import type { Core } from '@strapi/strapi';
 import type { Context } from 'koa';
 import { allowQuery, feedQuery, readDocumentId } from '../../../utils/read-query';
-import { discussionInput } from '../../../utils/publish-input';
+import { bestAnswerInput, discussionInput } from '../../../utils/publish-input';
 
 export default ({ strapi }: { strapi: Core.Strapi }) => ({
+  async bestAnswer(ctx: Context) {
+    allowQuery(ctx.query, []);
+    const documentId = readDocumentId(ctx.params.documentId);
+    const reply = bestAnswerInput(ctx.request.body);
+    ctx.set('Cache-Control', 'no-store');
+    return strapi.service('api::discussion.discussion').setBestAnswer(ctx.state.user.documentId, documentId, reply);
+  },
   async create(ctx: Context) {
     allowQuery(ctx.query, []);
     const input = discussionInput(ctx.request.body);

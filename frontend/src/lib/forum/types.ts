@@ -17,13 +17,19 @@ export type DiscussionSummary = {
   author: Author | null;
   category: Omit<Category, "description"> | null;
   replyCount: number;
+  bestAnswerId: string | null;
 };
-export type Discussion = DiscussionSummary & { content: string };
+export type Discussion = DiscussionSummary & {
+  content: string;
+  bestAnswer: Pick<Reply, "documentId" | "content" | "createdAt" | "author"> | null;
+};
 export type Reply = {
   documentId: string;
   content: string;
   createdAt: string;
   author: Author | null;
+  usefulCount: number;
+  hasVoted: boolean;
 };
 export type Pagination = {
   page: number;

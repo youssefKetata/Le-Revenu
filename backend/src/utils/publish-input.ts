@@ -49,3 +49,16 @@ export function replyInput(body: unknown) {
 }
 
 export type ReplyInput = ReturnType<typeof replyInput>;
+
+export function usefulInput(body: unknown): boolean {
+  const data = dataInput(body, ['useful']);
+  if (typeof data.useful !== 'boolean') {
+    throw new errors.ValidationError('useful must be a boolean.');
+  }
+  return data.useful;
+}
+
+export function bestAnswerInput(body: unknown): string | null {
+  const data = dataInput(body, ['reply']);
+  return data.reply === null ? null : readDocumentId(data.reply, 'reply');
+}

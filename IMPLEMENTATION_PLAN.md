@@ -1,6 +1,6 @@
 # Le Revenu technical test: scope and implementation plan
 
-Status: phases 1–4 implemented, with the v2 design and approved discussion-search bonus. Six focused backend scenarios cover seeding, reads, search, bounded excerpts, sessions, publishing, validation and author protection. Three frontend HTTP rendering scenarios cover feeds, search and details. A local HTTP form journey passed login → create → reply → reload → logout with temporary records cleaned up. Desktop/mobile browser verification is accessible for the app; the local-file mockup remains unavailable to the browser tool. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432).
+Status: phases 1–4 implemented, with the v2 design and approved search, useful-vote and best-answer bonuses. Eight focused backend scenarios cover seeding, reads, search, bounded excerpts, sessions, publishing, validation, author protection, votes and answer selection. Three frontend HTTP rendering scenarios cover feeds, search and details. A local HTTP form journey passed login → create → reply → reload → logout with temporary records cleaned up. Desktop/mobile browser verification is accessible for the app; the local-file mockup remains unavailable to the browser tool. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432).
 
 ## 1. Source of truth
 
@@ -35,7 +35,7 @@ Backend pagination is an explicit architecture requirement. Visible pagination c
 
 ### Out of the first delivery
 
-- Polls and voting, useful votes, best-answer selection.
+- Polls and poll voting. Useful reply votes and best-answer selection are now included as approved bonuses.
 - Points, badges, streaks, leaderboards and member blogs.
 - Notifications, email digests, following and live events.
 - Mentions, avatar uploads, full profiles and personalized feeds.
@@ -178,7 +178,8 @@ Completion gate: a reviewer can reproduce the project locally from the repositor
 - Visible discussion/reply pagination controls are implemented.
 - Discussion search is implemented as an approved bonus: bounded `q` input, native Strapi title/content filtering, URL state and existing category/sort/pagination. No external search service or compatibility layer.
 - Add a small Playwright journey if useful and affordable on the machine.
-- Add votes/best answer only if there is enough time to implement and test their authorization rules.
+- Useful reply votes and best-answer selection are implemented as approved bonuses, with Strapi authorization, native relations, idempotent transactional writes and focused integration tests. Self-voting and self-acceptance are forbidden. Only question authors can select, replace or clear a related answer; votes are removable and voter identities stay private.
+- Enhanced votes update optimistically with React, reconcile with authoritative Strapi counts without navigation, and roll back on failures. Three DOM component scenarios cover pending feedback, duplicate protection, rebasing, rollback/reconnection and retry; the native form fallback is retained.
 - Prepare a concise walkthrough explaining the model, Strapi boundaries, permissions, data fetching, freshness and tradeoffs.
 
 Docker remains optional and is deliberately excluded from this plan.
