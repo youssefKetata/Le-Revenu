@@ -1,16 +1,52 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { createDiscussion } from "@/app/actions/publish";
 import PublishError from "@/components/forum/publish-error";
 import { Button } from "@/components/ui/button";
-import { FormField, formControlClassName } from "@/components/ui/form-field";
+import Icon from "@/components/ui/icon";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  FormField,
+  FieldError,
+  fieldDescription,
+  formControlClassName,
+  submitOnShortcut,
+} from "@/components/ui/form-field";
 import type { Category, PublishState } from "@/lib/forum/types";
+import { textError } from "@/lib/form-validation";
+import { useFormValidation } from "@/lib/use-form-validation";
+
+const types = [
+  {
+    value: "question",
+    icon: "help",
+    label: "Poser une question",
+    help: "Obtenez l’aide des membres de la communauté",
+  },
+  {
+    value: "discussion",
+    icon: "msg",
+    label: "Lancer une discussion",
+    help: "Partagez une expérience, un avis, une actualité",
+  },
+] as const;
 
 export default function DiscussionForm({
   categories,
+  initialType = "question",
+  initialCategory = "",
 }: {
   categories: Pick<Category, "documentId" | "name">[];
+  initialType?: "question" | "discussion";
+  initialCategory?: string;
 }) {
   const [state, action, pending] = useActionState<PublishState, FormData>(
     createDiscussion,
@@ -18,98 +54,164 @@ export default function DiscussionForm({
   );
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [category, setCategory] = useState("");
-  const [type, setType] = useState("question");
+  const [category, setCategory] = useState(initialCategory);
+  const [type, setType] = useState(initialType);
+  const validation = useFormValidation(
+    {
+      type: (value) =>
+        value === "question" || value === "discussion"
+          ? undefined
+          : "Choisissez Question ou Discussion.",
+      title: (value) => textError(value, 10, 255),
+      category: (value) =>
+        categories.some((item) => item.documentId === value)
+          ? undefined
+          : "Choisissez un espace.",
+      content: (value) => textError(value, 1, 50_000),
+    },
+    state,
+    { type: "type-question" },
+  );
+  const { errors } = validation;
   return (
     <form
       action={action}
-      className="mt-[26px] flex flex-col gap-[22px]"
-      aria-describedby={state.error ? "publish-error" : undefined}
+      noValidate
+      aria-describedby={validation.formError ? "publish-error" : undefined}
+      onSubmit={validation.submit}
     >
-      <fieldset disabled={pending} className="space-y-6">
-        <legend className="sr-only">Créer une discussion</legend>
-        <FormField
-          id="title"
-          label="Titre de votre publication"
-          hint="Un titre précis, entre 10 et 255 caractères."
-        >
-          <input
+      <div className="space-y-4 px-4 pt-4 pb-[22px] md:px-[22px]">
+        <fieldset disabled={pending} className="space-y-3.5">
+          <legend className="sr-only">Créer une discussion</legend>
+          <fieldset
+            className="grid gap-2.5 md:grid-cols-2"
+            aria-invalid={!!errors.type}
+            aria-describedby={fieldDescription("type", errors.type)}
+          >
+            <legend className="sr-only">Type de publication</legend>
+            {types.map((item) => (
+              <label
+                key={item.value}
+                className={`flex cursor-pointer items-center gap-2.5 rounded-xl border-[1.5px] px-3 py-[11px] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand md:flex-col md:items-start md:gap-1 md:py-3.5 ${type === item.value ? "border-brand bg-brand-soft" : "border-border hover:border-border-strong"}`}
+              >
+                <input
+                  className="sr-only"
+                  type="radio"
+                  id={`type-${item.value}`}
+                  name="type"
+                  value={item.value}
+                  checked={type === item.value}
+                  onChange={() => {
+                    setType(item.value);
+                    validation.change("type", item.value);
+                  }}
+                />
+                <Icon
+                  name={item.icon}
+                  className="size-[22px] text-brand-text md:mb-1"
+                />
+                <strong className="text-[14.5px]">{item.label}</strong>
+                <small className="hidden text-[12.5px] leading-snug text-muted md:block">
+                  {item.help}
+                </small>
+              </label>
+            ))}
+          </fieldset>
+          <FieldError id="type" error={errors.type} />
+          <FormField
             id="title"
-            name="title"
-            className={formControlClassName}
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            minLength={10}
-            maxLength={255}
-            required
-            aria-invalid={state.field === "title" || undefined}
-            aria-describedby="title-help"
-            placeholder="Ex. : Comment répartir mon épargne cette année ?"
-          />
-        </FormField>
-        <div className="grid gap-[18px] md:grid-cols-2">
-          <FormField id="category" label="Espace">
-            <select
-              id="category"
-              name="category"
-              className={formControlClassName}
+            label="Titre"
+            hint="Un titre clair, entre 10 et 255 caractères, obtient plus vite des réponses."
+            error={errors.title}
+          >
+            <input
+              id="title"
+              autoFocus
+              name="title"
+              className={`${formControlClassName} h-10`}
+              value={title}
+              onChange={(event) => {
+                setTitle(event.currentTarget.value);
+                validation.change("title", event.currentTarget.value);
+              }}
+              aria-required="true"
+              aria-invalid={!!errors.title}
+              aria-describedby={fieldDescription("title", errors.title, true)}
+              placeholder={
+                type === "question"
+                  ? "Ex. : Faut-il ouvrir un PER à 45 ans ?"
+                  : "Ex. : Mon retour d’expérience sur la renégociation de mon crédit"
+              }
+            />
+          </FormField>
+          <FormField id="category" label="Espace" error={errors.category}>
+            <input type="hidden" name="category" value={category} />
+            <Select
               value={category}
-              onChange={(event) => setCategory(event.target.value)}
-              required
-              aria-invalid={state.field === "category" || undefined}
+              onValueChange={(value) => {
+                // Ignore empty native form-reset events; the draft is controlled.
+                if (value) {
+                  setCategory(value);
+                  validation.change("category", value);
+                }
+              }}
+              disabled={pending}
             >
-              <option value="" disabled>
-                Choisir un espace
-              </option>
-              {categories.map((item) => (
-                <option key={item.documentId} value={item.documentId}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                id="category"
+                aria-required="true"
+                aria-invalid={!!errors.category}
+                aria-describedby={fieldDescription("category", errors.category)}
+              >
+                <SelectValue placeholder="Choisissez un espace…" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((item) => (
+                  <SelectItem key={item.documentId} value={item.documentId}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </FormField>
-          <FormField id="type" label="Type de publication">
-            <select
-              id="type"
-              name="type"
-              className={formControlClassName}
-              value={type}
-              onChange={(event) => setType(event.target.value)}
-              required
-              aria-invalid={state.field === "type" || undefined}
-            >
-              <option value="question">Question</option>
-              <option value="discussion">Discussion</option>
-            </select>
-          </FormField>
-        </div>
-        <FormField
-          id="content"
-          label="Votre message"
-          hint="Contenu obligatoire · 50 000 caractères maximum · Texte simple."
-        >
-          <textarea
+          <FormField
             id="content"
-            name="content"
-            className={`${formControlClassName} resize-y leading-relaxed`}
-            value={content}
-            onChange={(event) => setContent(event.target.value)}
-            rows={10}
-            maxLength={50_000}
-            required
-            aria-invalid={state.field === "content" || undefined}
-            aria-describedby="content-help"
-            placeholder="Donnez le contexte et partagez votre question ou votre expérience…"
-          />
-        </FormField>
-      </fieldset>
-      <PublishError state={state} returnTo="/discussions/nouvelle" />
-      <div className="flex flex-wrap items-center justify-between gap-[15px] border-t border-border pt-5">
-        <p className="text-sm text-muted">
+            label="Détails"
+            hint="Contenu obligatoire · 50 000 caractères maximum."
+            error={errors.content}
+          >
+            <textarea
+              id="content"
+              name="content"
+              className={`${formControlClassName} resize-y leading-normal`}
+              value={content}
+              onChange={(event) => {
+                setContent(event.currentTarget.value);
+                validation.change("content", event.currentTarget.value);
+              }}
+              onKeyDown={submitOnShortcut}
+              rows={5}
+              aria-required="true"
+              aria-invalid={!!errors.content}
+              aria-describedby={fieldDescription("content", errors.content, true)}
+              placeholder="Votre situation, ce que vous avez déjà envisagé… Plus le contexte est précis, meilleures sont les réponses."
+            />
+          </FormField>
+        </fieldset>
+        <p className="rounded-[9px] bg-surface-muted px-3 py-2.5 text-[13px] text-secondary">
+          Partagez votre expérience, sans sollicitation.{" "}
+          <Link href="/charte" className="font-semibold text-brand-text">
+            Lire la charte
+          </Link>
+        </p>
+        <PublishError state={{ ...state, error: validation.formError }} returnTo="/discussions/nouvelle" />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-hairline px-4 py-3.5 md:px-[22px]">
+        <p className="text-[12.5px] text-muted">
           Votre publication sera visible par tous.
         </p>
         <Button type="submit" disabled={pending}>
-          {pending ? "Publication…" : "Publier ma discussion"}
+          {pending ? "Publication…" : "Publier"}
         </Button>
       </div>
     </form>

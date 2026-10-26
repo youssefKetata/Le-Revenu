@@ -10,11 +10,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Project conventions
 
-- Use Tailwind utilities for component layout, spacing, typography, responsive states and colors. Shared design tokens live in `app/globals.css`.
+- Use Tailwind utilities for component layout, spacing, typography, responsive states and colors. Shared light/dark design tokens live in `styles/theme.css`, with Tailwind aliases in `app/globals.css`.
 - Keep `globals.css` limited to Tailwind setup, fonts, tokens and base element rules. Component selectors belong in colocated CSS Modules only when custom CSS is clearer than utilities, such as a layered background.
 - Put shared controls in `components/ui`, the site shell in `components/layout`, and forum presentation in `components/forum`. Keep route-specific forms next to their pages. Do not add barrel exports or compatibility shims.
 - Reuse the existing buttons, cards and form fields instead of introducing competing styles. Extract components for a distinct responsibility or actual reuse; avoid splitting every small fragment.
+- Forms use `noValidate` and the shared custom-validation hook. Render small red errors through `FormField`/`FieldError`, connect them with `aria-describedby`, and focus the first invalid field. Use `aria-required` for accessibility instead of browser validation constraints. Strapi remains authoritative for publishing rules.
+- Use the shared shadcn/ui Select for form dropdowns and Dropdown Menu for action menus. Preserve the shared input styling and form submission and required-field validation, with keyboard support and reduced-motion animations.
 - Keep Strapi reads in `lib/forum/api.ts`, public types in `lib/forum/types.ts`, and URL parsing/building in `lib/forum/query.ts`. `lib/strapi.ts` is the server-only HTTP transport.
 - Pages orchestrate server reads. Client Components are limited to interaction. Server Actions forward intended fields with the member token; business validation, authorship and persistence stay in Strapi.
 - Handle expected service failures explicitly and let unexpected errors reach the error boundary. Preserve uncached reads, bounded pagination, request-scoped identity checks and the agreed ten-minute sessions.
 - Keep tests focused on observable behavior. Rendering checks must not depend on CSS class names.
+- Use `maquette-communaute-le-revenu-v2.html` as the current visual reference within the assignment's existing feature scope. Do not add simulated metrics, controls or unsupported features.
+- Login and publishing use intercepted route dialogs on client navigation and standalone pages on direct navigation. Keep both paths working. Use the shared shadcn/ui Radix Dialog with `tw-animate-css`; route dismissal must wait for its exit animation and respect reduced motion. Apply the Tailwind loader only to `globals.css`; CSS Modules use Next.js's native processing.

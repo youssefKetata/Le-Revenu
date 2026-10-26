@@ -39,6 +39,7 @@ test("feed renders API discussions, preserves filter/order and handles empty or 
   assert.equal(cards.length, data.length);
   data.forEach((discussion, index) => {
     assert.ok(cards[index].includes(escapeHtml(discussion.title)));
+    assert.ok(cards[index].includes(escapeHtml(discussion.excerpt)));
     assert.ok(cards[index].includes(`/discussions/${discussion.documentId}`));
     assert.ok(
       cards[index].includes(
@@ -74,6 +75,11 @@ test("feed renders API discussions, preserves filter/order and handles empty or 
     (await page("/?page=5001")).includes("Aucune discussion sur cette page"),
   );
   assert.ok((await page("/?sort=invalid")).includes("Filtres invalides"));
+  const compact = await page("/?view=compact");
+  assert.ok(compact.includes("Vue détaillée"));
+  data.forEach((item) => assert.ok(compact.includes(escapeHtml(item.title))));
+  assert.ok((await page("/espaces")).includes(escapeHtml(category.name)));
+  assert.ok((await page("/charte")).includes("Bienveillance"));
 });
 
 test("detail renders persisted content/replies, offers login and handles missing discussions", async () => {

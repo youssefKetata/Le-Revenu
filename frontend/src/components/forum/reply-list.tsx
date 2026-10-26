@@ -21,9 +21,15 @@ export default function ReplyList({
             as="article"
             id={`reply-${reply.documentId}`}
             key={reply.documentId}
+            padding="none"
+            className="px-4 py-4 md:px-5"
           >
-            <Byline author={reply.author} createdAt={reply.createdAt} />
-            <p className="mt-4 leading-[1.85] whitespace-pre-wrap wrap-anywhere">
+            <Byline
+              author={reply.author}
+              createdAt={reply.createdAt}
+              variant="reply"
+            />
+            <p className="mt-2.5 max-w-[66ch] text-[15.5px] leading-[1.7] whitespace-pre-wrap wrap-anywhere">
               {reply.content}
             </p>
           </Card>

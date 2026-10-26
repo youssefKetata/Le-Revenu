@@ -1,11 +1,16 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { clearSession, saveSession, sessionToken } from "@/lib/session";
 import { StrapiError, strapiRequest } from "@/lib/strapi";
 import { safeReturnTo } from "@/lib/forum/query";
+import { passwordError, textError } from "@/lib/form-validation";
 
-export type LoginState = { error: string | null; identifier: string };
+export type LoginState = {
+  error: string | null;
+  identifier: string;
+  field?: "identifier" | "password";
+};
 
 export async function login(
   _previous: LoginState,
@@ -15,11 +20,7 @@ export async function login(
   const identifier = typeof value === "string" ? value.trim() : "";
   const password = formData.get("password");
   if (
-    !identifier ||
-    identifier.length > 254 ||
     typeof password !== "string" ||
-    !password ||
-    Buffer.byteLength(password, "utf8") > 72 ||
     formData.getAll("identifier").length !== 1 ||
     formData.getAll("password").length !== 1
   ) {
@@ -28,6 +29,12 @@ export async function login(
       identifier: identifier.slice(0, 254),
     };
   }
+  const identifierError = textError(identifier, 1, 254);
+  if (identifierError)
+    return { error: identifierError, field: "identifier", identifier: identifier.slice(0, 254) };
+  const invalidPassword = passwordError(password);
+  if (invalidPassword)
+    return { error: invalidPassword, field: "password", identifier };
   try {
     const response = await strapiRequest<{ jwt: string }>("/auth/local", {
       method: "POST",
@@ -43,9 +50,13 @@ export async function login(
         : status >= 500
           ? "Le service de connexion est indisponible. Réessayez dans quelques instants."
           : "Identifiant ou mot de passe incorrect, ou compte indisponible.";
-    return { error: message, identifier };
+    return {
+      error: message,
+      identifier,
+      ...(status < 500 && status !== 429 ? { field: "password" as const } : {}),
+    };
   }
-  redirect(safeReturnTo(formData.get("returnTo")));
+  redirect(safeReturnTo(formData.get("returnTo")), RedirectType.replace);
 }
 
 export async function logout(): Promise<void> {

@@ -4,7 +4,7 @@ Technical assignment: a community forum built with Next.js App Router, React, Ty
 
 ## Current scope
 
-Phases 1–4 are implemented: foundation, Strapi data/API, login and secure publishing, and the community feed, filters, sorting, discussion detail and authenticated discussion/reply forms. The HTTP journey and focused rendering tests pass; desktop/mobile browser visual verification remains pending. See the [implementation plan](IMPLEMENTATION_PLAN.md).
+Phases 1–4 are implemented, with the v2 UI applied within the assignment's existing feature scope: live feeds, category filters, date sorting, detailed/compact views, discussion/reply pages, and shadcn/ui login/publishing dialogs with standalone URLs. The HTTP journey and focused rendering tests pass. See the [implementation plan](IMPLEMENTATION_PLAN.md).
 
 ```text
 frontend/                 Next.js application
@@ -154,7 +154,7 @@ Example: `http://127.0.0.1:1337/api/discussions?category=bourse&sort=newest&page
 
 Lists return `{ data: [...], meta: { pagination: { page, pageSize, pageCount, total } } }`. Detail returns `{ data: { ... }, meta: {} }`. Pagination defaults to page 1 and 25 records, allows at most 100 records per page, and rejects offsets above 100,000. Valid pages beyond the last page return an empty list with the matching total; unknown category slugs return an empty list. Dates use `createdAt`, with `documentId` as a stable tie-breaker. Categories are sorted by name.
 
-The feed returns `documentId`, `title`, `type`, `createdAt`, `author`, `category` and `replyCount`. Only detail includes discussion `content`. Replies return `documentId`, `content`, `createdAt` and `author`. Author projections contain only `documentId` and `username`; user emails, credentials, roles and tokens are never included. Deleted authors or categories are represented by `null`. Numeric database IDs are not part of this API contract.
+The feed returns `documentId`, `title`, `excerpt`, `type`, `createdAt`, `author`, `category` and `replyCount`. The plain-text excerpt is at most 220 UTF-16 code units, with whitespace collapsed. Strapi projects bounded text previews in one additional batched database query for the current page; it does not transfer full bodies or issue a query per card. Only detail includes discussion `content`. Replies return `documentId`, `content`, `createdAt` and `author`. Author projections contain only `documentId` and `username`; user emails, credentials, roles and tokens are never included. Deleted authors or categories are represented by `null`. Numeric database IDs are not part of this API contract.
 
 Queries fetch explicit fields and relations through Strapi's Document Service. Reply counts use Strapi's count-only relation population, which runs one grouped count for the page instead of fetching reply bodies or counting each discussion separately. Replies are fetched and paginated independently. Reads send `Cache-Control: no-store` so dashboard edits appear on the next request.
 
@@ -219,7 +219,7 @@ Use a new terminal for `dev:backend`, or set `$env:NODE_ENV = 'development'` whe
 - Frontend environment template: `frontend/.env.example`.
 - Backend database configuration: `backend/config/database.ts`, PostgreSQL only.
 - `STRAPI_URL` is server-side configuration. Never place database credentials or privileged Strapi tokens in `NEXT_PUBLIC_*` variables.
-- Playfair Display bold is served locally from `frontend/public/fonts/`, with its Open Font License included. Startup and builds do not download fonts. Body text uses system fonts.
+- Playfair Display bold and Inter are served locally from `frontend/public/fonts/`, with their Open Font Licenses included. Startup and builds do not download fonts. Body text follows the mockup's system-font/Inter stack.
 - Dependencies for the two applications are installed separately, with their own lockfiles; Strapi's admin React version is independent from the Next.js frontend.
 - Strapi content-type schemas will be committed to Git. Its application database tables are initialized through Strapi; no hand-written forum SQL schema is used.
 
@@ -269,23 +269,28 @@ npm run test:frontend
 
 These compare rendered discussions and replies with live Strapi data, verify filtering/order and metadata, and exercise empty/invalid/missing pages and anonymous publishing navigation. They require `http://localhost:3000` and `http://127.0.0.1:1337` by default; override with `TEST_FRONTEND_URL` and `TEST_STRAPI_URL`. No database records are changed.
 
-A separate local HTTP form check also passed Next.js login, native validation feedback, discussion creation, reply publication, reload, content escaping and logout. Its temporary discussion/reply were removed. Frontend TypeScript, lint and the production build pass for phase 4. Browser visual and hydrated interaction checks remain pending: the browser tool still rejected its local test origin. HTTP checks do not establish visual fidelity or client-side draft retention.
+A separate local HTTP form check also passed Next.js login, native validation feedback, discussion creation, reply publication, reload, content escaping and logout. Its temporary discussion/reply were removed. Desktop/mobile browser checks now cover the rendered v2 layout, native login, publishing dialog and navigation. The tool cannot open the local-file mockup, so reference comparisons use its HTML/CSS values; this is not a claim of screenshot-perfect comparison. Drafts remain in memory after validation errors and are lost on reload or closing the form.
+
+For the v2 changes, the five backend scenarios, two frontend rendering scenarios, frontend lint/TypeScript and both production builds pass. Browser checks used the normal desktop viewport and a 390 × 844 mobile viewport, including account-menu logout and Escape dismissal of dialogs.
 
 ## Frontend journey and rendering
 
-- `/` renders live, paginated discussions through Server Components. `category`, `sort` and `page` stay in the URL; filtering/sorting reset to page one. The GET sort form works without client JavaScript.
+- `/` renders live, paginated discussions through Server Components. `category`, `sort`, `page` and compact `view` stay in the URL; filtering/sorting reset to page one. Filter, sort and view links work without client JavaScript.
 - `/discussions/[documentId]` renders the discussion, public author/date/category and paginated replies. Content is rendered as React text with preserved line breaks, never interpreted as HTML. Missing discussions use the not-found page; service failures show a retry state.
-- `/discussions/nouvelle` requires a verified member. Native browser constraints provide immediate feedback; Strapi remains responsible for authoritative validation. Only intended fields are forwarded, and Strapi assigns the author.
+- `/discussions/nouvelle` requires a verified member. Login, publishing and reply forms use custom validation with small red field errors, first-error focus and live correction after submission. Browser constraint popups and native length caps are disabled; Strapi remains responsible for authoritative publishing validation. Only intended fields are forwarded, and Strapi assigns the author.
 - Successful creation redirects to the new discussion. Reply publication redirects to the final reply page and the new reply's anchor. Both invalidate affected Next.js routes; API reads remain uncached.
 - Controlled forms keep typed text in memory on failed submissions. Expired-session feedback opens login in another tab so the original draft stays open; drafts are not persisted across reloads. Login return destinations are limited to known local forum routes.
 - A shared session-aware header, responsive category navigation, loading/empty/error states and reusable discussion/byline/pagination components preserve the supplied mockup's main visual identity. Unsupported prototype controls are omitted.
 
 Frontend structure is organized by responsibility: `components/ui/` contains shared controls, `components/layout/` contains the site shell, and `components/forum/` contains forum presentation. Route-specific forms stay next to their pages. `lib/forum/` groups API reads, public types and URL helpers; server-only transport and sessions remain in `lib/strapi.ts` and `lib/session.ts`. See [frontend/README.md](frontend/README.md) for the directory map and [frontend/AGENTS.md](frontend/AGENTS.md) for implementation conventions.
 
-Ordinary component styles use Tailwind utilities and shared controls. Global CSS is limited to fonts, design tokens and base element rules. A small colocated CSS Module handles the hero's layered gradient. Expected service failures have explicit feedback; unexpected code errors reach the route error boundary. Backend structure stays within Strapi's native controllers/services/policies conventions, with no extra repository layer or parallel Next.js business backend.
+Ordinary component styles use Tailwind utilities and shared controls. Light/dark tokens live in `frontend/src/styles/theme.css`; global CSS is limited to font loading, Tailwind aliases and base rules. Small colocated CSS Modules handle layered gradients. The shared shadcn/ui Dialog uses Radix and `tw-animate-css` for accessible animated overlays. Login/publishing use Next.js intercepted routes on client navigation and standalone pages on direct visits. Expected service failures have explicit feedback; unexpected code errors reach the route error boundary. Backend structure stays within Strapi's native controllers/services/policies conventions, with no extra repository layer or parallel Next.js business backend.
+
+The current visual reference is `maquette-communaute-le-revenu-v2.html`. Its unsupported search, polls/votes, best answers, notifications, profiles/points, blogs, events and editorial tools remain excluded. Metrics and content come from Strapi. Authentication uses community demo accounts rather than lerevenu.com SSO, and discussion content remains mandatory as required by the PDF. The spaces and charter links have real pages; the top external editorial links retain the mockup's lerevenu.com destination.
 
 ## Source material
 
 - `Test_technique_Developpeur_Full_Stack_Le_Revenu.pdf`
 - `maquette-communaute-le-revenu.html`
+- `maquette-communaute-le-revenu-v2.html`
 - `IMPLEMENTATION_PLAN.md`

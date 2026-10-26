@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import SiteHeader, { HeaderShell } from "@/components/layout/site-header";
+import SiteHeader, {
+  HeaderShell,
+  SiteBar,
+  MobileNavigation,
+} from "@/components/layout/site-header";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,16 +15,18 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+  modal,
+}: Readonly<{ children: React.ReactNode; modal: React.ReactNode }>) {
   return (
-    <html lang="fr" className="h-full antialiased">
+    <html lang="fr" className="h-full antialiased" data-scroll-behavior="smooth">
       <body className="min-h-full flex flex-col">
         <a
-          className="fixed top-2 left-2 z-50 -translate-y-[200%] rounded-lg bg-white px-4 py-2.5 focus:translate-y-0"
+          className="fixed top-2 left-3 z-50 -translate-y-[200%] rounded-lg bg-foreground px-3.5 py-2 font-semibold text-background focus:translate-y-0"
           href="#main"
         >
           Aller au contenu
         </a>
+        <SiteBar />
         <Suspense
           fallback={
             <HeaderShell>
@@ -31,10 +37,10 @@ export default function RootLayout({
           <SiteHeader />
         </Suspense>
         {children}
-        <footer className="mx-auto mt-auto w-full max-w-7xl border-t border-border px-4 py-6 text-[11px] text-muted md:px-6">
-          La communauté des lecteurs du Revenu. Échangeons avec respect et
-          bienveillance.
-        </footer>
+        {modal}
+        <Suspense fallback={null}>
+          <MobileNavigation />
+        </Suspense>
       </body>
     </html>
   );

@@ -1,11 +1,11 @@
 # Le Revenu technical test: scope and implementation plan
 
-Status: phases 1–4 implemented. Five focused backend scenarios verify seeding, reads, sessions, publishing, validation and author protection. Two frontend HTTP rendering scenarios pass, and a local HTTP form journey passed login → create → reply → reload → logout with temporary records cleaned up. Browser visual/hydration verification remains pending because the browser tool still rejects its local test origin. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432).
+Status: phases 1–4 implemented, with the v2 design applied within the existing assignment scope. Five focused backend scenarios verify seeding, reads, bounded excerpts, sessions, publishing, validation and author protection. Two frontend HTTP rendering scenarios pass, and a local HTTP form journey passed login → create → reply → reload → logout with temporary records cleaned up. Desktop/mobile browser verification is now accessible for the app; the local-file mockup remains unavailable to the browser tool. Strapi uses the dedicated database on the existing PostgreSQL Windows service (port 5432).
 
 ## 1. Source of truth
 
 - `Test_technique_Developpeur_Full_Stack_Le_Revenu.pdf`: mandatory requirements and deliverables.
-- `maquette-communaute-le-revenu.html`: design and interaction reference.
+- `maquette-communaute-le-revenu-v2.html`: current design and interaction reference, approved within the assignment's existing feature scope. The original HTML remains preserved.
 - The PDF explicitly permits a focused implementation rather than a complete reproduction.
 - When the prototype and brief disagree, follow the PDF. In particular, discussion content is required even though the prototype labels it optional.
 - AI assistance is allowed. The candidate must understand and justify the implementation in a 30-minute technical review.
@@ -146,7 +146,7 @@ Completion gate passed: direct HTTP requests return the correct seeded content, 
 
 ### Phase 3: Secure publishing, with API tests
 
-- Add minimal demo login/logout. Implemented with native Strapi auth, Next.js Server Actions and an HttpOnly cookie. Browser UI verification is pending.
+- Add minimal demo login/logout. Implemented with native Strapi auth, Next.js Server Actions and an HttpOnly cookie; native login verified in the browser.
 - Implement authenticated discussion/reply creation in Strapi. Implemented as two POST endpoints with permission and active-session checks.
 - Enforce title/content/type/relation validation and reject author spoofing or unwanted fields. Implemented in Strapi's publishing input parser and services.
 - Add API integration tests using an isolated PostgreSQL test schema. Implemented in `scripts/forum-api.test.mjs`; tests call the actual Strapi HTTP surface, including native login/logout.
@@ -159,13 +159,13 @@ API completion gate passed: valid writes persist; invalid, unauthenticated and i
 - Build the new-discussion form and reply form with pending/error/success states. Implemented with controlled Client Components and thin authenticated Server Actions; Strapi retains all business rules.
 - Redirect to the created discussion; refresh replies and counts after publishing. Implemented with route invalidation and a redirect to the final reply page/new reply anchor.
 - Add loading, empty, not-found and API-error states, plus frontend rendering tests. Implemented; two read-only HTTP rendering scenarios pass. Locally bundled typography and responsive layouts follow the reference design.
-- Structure review: forum components and API helpers are grouped by responsibility; shared controls own button/form styling; global CSS contains only fonts, tokens and base rules. Tailwind is used for ordinary component styles, with one small CSS Module for the layered hero background. Normal detail/reply reads run in parallel, and unexpected exceptions reach the error boundary. The native Strapi backend organization is retained.
+- Structure review: forum components and API helpers are grouped by responsibility; shared controls own button/form styling; global CSS contains only fonts, Tailwind aliases and base rules, with palette tokens in `styles/theme.css`. Tailwind handles ordinary component styles, with small CSS Modules for gradients and a shared shadcn/ui Dialog using Radix and `tw-animate-css`. Normal detail/reply reads run in parallel, and unexpected exceptions reach the error boundary. The native Strapi backend organization is retained.
 
-HTTP journey gate passed against real PostgreSQL data, including native validation and safe text rendering. Browser visual and hydrated interaction checks remain pending; do not mark the browser completion gate passed until verified.
+HTTP journey gate passed against real PostgreSQL data, including native validation and safe text rendering. Desktop/mobile browser checks cover the live layout, native login, route dialogs and navigation. The v2 source is compared through HTML/CSS values because the browser tool rejects local-file URLs; direct screenshot comparison remains unavailable.
 
 ### Phase 5: Responsive fidelity and delivery verification
 
-- Refine the supplied design across desktop and mobile, including keyboard behavior.
+- Refine the supplied design across desktop and mobile, including keyboard behavior. V2 layout, theme, cards, compact feed, mobile navigation, spaces/charter pages and shadcn/ui route dialogs are implemented within the existing feature scope. Feed excerpts use one bounded batched Strapi projection; no schema or compatibility layer is added.
 - Review permissions, safe response fields and invalid session behavior.
 - Run automated tests, type checks, lint checks and production builds sequentially.
 - Verify startup and seeding against a fresh dedicated database using only README instructions.

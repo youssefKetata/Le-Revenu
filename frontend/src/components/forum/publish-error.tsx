@@ -13,7 +13,7 @@ export default function PublishError({
   return (
     <div
       id="publish-error"
-      className="rounded-[9px] border border-red-200 bg-red-50 px-[15px] py-3 text-[13px] leading-relaxed text-red-800"
+      className="rounded-[9px] border border-brand-text/30 bg-brand-soft px-[15px] py-3 text-[13px] leading-relaxed text-brand-text"
       role="alert"
     >
       <p>{state.error}</p>

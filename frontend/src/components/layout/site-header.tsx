@@ -2,24 +2,93 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { logout } from "@/app/actions/auth";
 import { getSession } from "@/lib/session";
-import { Avatar } from "@/components/forum/byline";
+import AccountMenu from "./account-menu";
+import MobileNav from "./mobile-nav";
+import Icon from "@/components/ui/icon";
 import { Button, ButtonLink } from "@/components/ui/button";
 
 export function Brand() {
   return (
     <Link
       href="/"
-      className="inline-flex shrink-0 items-center gap-3.5"
+      className="flex shrink-0 flex-col items-start gap-1 md:flex-row md:items-center md:gap-2.5"
       aria-label="Le Revenu — accueil de la communauté"
     >
-      <span className="inline-flex items-stretch gap-[3px] bg-brand p-[3px] text-xl leading-none font-black tracking-tighter text-white md:text-[22px]">
-        <span className="bg-black px-0.5 py-[3px]">LE</span>
-        <span className="px-0.5 py-[3px]">REVENU</span>
+      <span
+        aria-hidden="true"
+        className="inline-flex items-stretch bg-brand p-[.1em] text-[19px] leading-none font-black tracking-[-.02em] text-white md:text-[22px]"
+      >
+        <span className="mr-[.12em] bg-black px-[.1em] pt-[.1em] pb-[.12em]">
+          LE
+        </span>
+        <span className="px-[.1em] pt-[.1em] pb-[.12em]">REVENU</span>
       </span>
-      <span className="hidden border-l border-border pl-3.5 font-semibold md:inline">
+      <span className="hidden h-5 w-px bg-border-strong md:block" />
+      <span className="text-xs font-semibold text-secondary md:text-[15px]">
         Communauté
       </span>
     </Link>
+  );
+}
+
+export function SiteBar() {
+  return (
+    <div className="border-b border-hairline bg-surface text-[13px] text-secondary">
+      <div className="mx-auto flex h-[38px] max-w-[1260px] items-center gap-5 px-4">
+        <a
+          className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-foreground hover:text-brand-text"
+          href="https://www.lerevenu.com"
+          target="_blank"
+          rel="noopener"
+        >
+          <Icon name="arrowLeft" className="size-[15px]" />
+          Retour sur lerevenu.com
+        </a>
+        <nav
+          aria-label="Rubriques de lerevenu.com"
+          className="hidden min-w-0 gap-4 overflow-hidden border-l border-border pl-5 min-[1101px]:flex"
+        >
+          {[
+            "Bourse",
+            "Économie",
+            "Placements",
+            "Immobilier",
+            "Impôts",
+            "Succession",
+            "Vie pratique",
+          ].map((label) => (
+            <a
+              key={label}
+              className="whitespace-nowrap hover:text-brand-text"
+              href="https://www.lerevenu.com"
+              target="_blank"
+              rel="noopener"
+            >
+              {label}
+            </a>
+          ))}
+        </nav>
+        <span className="ml-auto flex items-center gap-4">
+          <a
+            className="hidden items-center gap-1.5 whitespace-nowrap hover:text-brand-text md:inline-flex"
+            href="https://www.lerevenu.com"
+            target="_blank"
+            rel="noopener"
+          >
+            <Icon name="book" className="size-[15px]" />
+            Le magazine
+          </a>
+          <a
+            className="rounded-full bg-brand px-[11px] py-[3px] font-semibold whitespace-nowrap text-white hover:brightness-[.93]"
+            href="https://www.lerevenu.com"
+            target="_blank"
+            rel="noopener"
+          >
+            S’abonner
+          </a>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -31,8 +100,8 @@ export function HeaderShell({
   notice?: ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-black/7 bg-white/90 backdrop-blur-lg">
-      <div className="mx-auto flex min-h-[66px] w-full max-w-7xl items-center gap-2.5 px-4 md:min-h-[74px] md:gap-5 md:px-6">
+    <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-hairline bg-glass shadow-[0_1px_0_var(--hairline),0_8px_24px_-18px_rgb(0_0_0/35%)] backdrop-blur-[20px] backdrop-saturate-180">
+      <div className="mx-auto flex h-[62px] w-full max-w-[1260px] items-center gap-5 px-4">
         <Brand />
         {children}
       </div>
@@ -49,7 +118,7 @@ export default async function SiteHeader() {
         session.unavailable && (
           <p
             role="status"
-            className="bg-red-50 px-6 py-2 text-center text-[13px] text-red-800"
+            className="bg-brand-soft px-4 py-2 text-center text-[13px] text-brand-text"
           >
             Le service de connexion est indisponible. Vos discussions restent
             accessibles.
@@ -57,28 +126,40 @@ export default async function SiteHeader() {
         )
       }
     >
-      <div className="ml-auto flex items-center justify-end gap-2 md:gap-2.5">
-        {session.member && (
-          <span className="hidden max-w-[150px] items-center gap-2 text-[13px] font-semibold wrap-anywhere md:inline-flex wide:max-w-[200px]">
-            <Avatar name={session.member.username} />
-            <span>{session.member.username}</span>
-          </span>
+      <div className="relative ml-auto flex items-center gap-2.5">
+        {session.member ? (
+          <>
+            <span className="hidden min-[861px]:inline-flex">
+              <ButtonLink href="/discussions/nouvelle">
+                <Icon name="plus" />
+                Publier
+              </ButtonLink>
+            </span>
+            <AccountMenu username={session.member.username} />
+          </>
+        ) : (
+          <>
+            <ButtonLink href="/connexion" variant="quiet">
+              Se connecter
+            </ButtonLink>
+            <span className="hidden min-[861px]:inline-flex">
+              <ButtonLink href="/connexion">Rejoindre</ButtonLink>
+            </span>
+          </>
         )}
-        {session.member || session.unavailable ? (
+        {session.unavailable && (
           <form action={logout}>
-            <Button variant="secondary" type="submit">
+            <Button type="submit" variant="quiet">
               Se déconnecter
             </Button>
           </form>
-        ) : (
-          <ButtonLink variant="secondary" href="/connexion">
-            Se connecter
-          </ButtonLink>
         )}
-        <ButtonLink href="/discussions/nouvelle" className="max-[380px]:hidden">
-          <span aria-hidden="true">＋</span> Publier
-        </ButtonLink>
       </div>
     </HeaderShell>
   );
+}
+
+export async function MobileNavigation() {
+  const session = await getSession();
+  return <MobileNav signedIn={Boolean(session.member)} />;
 }

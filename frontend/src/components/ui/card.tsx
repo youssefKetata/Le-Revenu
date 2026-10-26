@@ -1,16 +1,20 @@
 import type { ComponentProps } from "react";
 
-type Props = ComponentProps<"section"> & { as?: "section" | "article" };
+type Props = ComponentProps<"section"> & {
+  as?: "section" | "article";
+  padding?: "normal" | "none";
+};
 
 export default function Card({
   as: Element = "section",
+  padding = "normal",
   className = "",
   ...props
 }: Props) {
   return (
     <Element
       {...props}
-      className={`rounded-[14px] border border-black/7 bg-white p-[22px] shadow-sm ${className}`}
+      className={`rounded-2xl border border-hairline bg-surface shadow-card ${padding === "normal" ? "p-[18px]" : ""} ${className}`}
     />
   );
 }

@@ -1,5 +1,11 @@
 .background {
   background:
-    radial-gradient(ellipse at top right, #a41927 0%, transparent 65%),
-    linear-gradient(140deg, #333336, #19191c);
+    radial-gradient(
+      120% 140% at 100% 0%,
+      color-mix(in srgb, var(--brand) 55%, transparent) 0%,
+      transparent 55%
+    ),
+    linear-gradient(160deg, var(--hero-top), var(--hero));
+  box-shadow: 0 22px 44px -26px
+    color-mix(in srgb, var(--brand) 70%, transparent);
 }

@@ -1,15 +1,18 @@
 import Link from "next/link";
 import type { ComponentProps } from "react";
+import styles from "./button.module.css";
 
-type Variant = "primary" | "secondary";
+type Variant = "primary" | "secondary" | "quiet";
 const variants: Record<Variant, string> = {
-  primary:
-    "border-transparent bg-brand text-white shadow-sm hover:bg-brand-hover",
-  secondary: "border-border bg-white text-foreground hover:bg-surface-muted",
+  primary: `${styles.primary} border-transparent text-white hover:brightness-[.93]`,
+  secondary:
+    "border-hairline bg-surface text-foreground shadow-[0_1px_2px_rgb(0_0_0/6%)] hover:bg-surface-muted",
+  quiet:
+    "border-transparent text-secondary hover:bg-fill hover:text-foreground",
 };
 
 export function buttonClassName(variant: Variant = "primary", className = "") {
-  return `inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[9px] border px-[15px] py-2 text-[13px] leading-snug font-semibold text-center transition-colors disabled:cursor-wait disabled:opacity-65 ${variants[variant]} ${className}`;
+  return `inline-flex min-h-9 items-center justify-center gap-[7px] rounded-[10px] border px-4 py-1.5 text-sm leading-snug font-semibold text-center transition-[background-color,box-shadow,filter,transform] active:scale-[.98] disabled:cursor-wait disabled:opacity-65 motion-reduce:transition-none [@media(pointer:coarse)]:min-h-11 ${variants[variant]} ${className}`;
 }
 
 export function Button({

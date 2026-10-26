@@ -1,13 +1,16 @@
 import PageContainer from "@/components/layout/page-container";
-import CategoryNav from "@/components/forum/category-nav";
+import CategoryNav, { CategoryScroller } from "@/components/forum/category-nav";
 import CommunityHero from "@/components/forum/community-hero";
 import CommunitySidebar from "@/components/forum/community-sidebar";
 import DiscussionCard from "@/components/forum/discussion-card";
+import FeedControls from "@/components/forum/feed-controls";
+import QuickComposer from "@/components/forum/quick-composer";
 import Pagination from "@/components/forum/pagination";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Notice, ServiceError } from "@/components/ui/notice";
 import { getCategories, getDiscussions } from "@/lib/forum/api";
 import { feedHref, readFeedQuery, type SearchParams } from "@/lib/forum/query";
+import { getSession } from "@/lib/session";
 import { StrapiError } from "@/lib/strapi";
 
 export default async function Home({
@@ -27,11 +30,12 @@ export default async function Home({
         </Notice>
       </PageContainer>
     );
-  let categories, feed;
+  let categories, feed, session;
   try {
-    [categories, feed] = await Promise.all([
+    [categories, feed, session] = await Promise.all([
       getCategories(),
       getDiscussions(query),
+      getSession(),
     ]);
   } catch (error) {
     if (!(error instanceof StrapiError)) throw error;
@@ -45,50 +49,44 @@ export default async function Home({
   return (
     <PageContainer
       width="community"
-      className="grid items-start gap-[18px] md:grid-cols-[180px_minmax(0,1fr)] md:gap-5 wide:grid-cols-[205px_minmax(0,1fr)_265px] wide:gap-[26px]"
+      className="grid items-start gap-[18px] md:grid-cols-[200px_minmax(0,1fr)] md:gap-7 wide:grid-cols-[212px_minmax(0,1fr)_304px]"
     >
       <CategoryNav categories={categories} query={query} />
-      <div className="min-w-0 space-y-5">
-        <CommunityHero category={category} />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-serif text-xl font-bold">
-            {query.category
-              ? (category?.name ?? "Discussions de cet espace")
-              : "Toutes les discussions"}
-            <span className="ml-2 inline-block rounded-md bg-neutral-200 px-[7px] py-px align-middle font-sans text-[11px]">
-              {feed.meta.pagination.total}
-            </span>
-          </h2>
-          <form method="get" action="/" className="flex gap-1.5">
-            {query.category && (
-              <input type="hidden" name="category" value={query.category} />
-            )}
-            <label htmlFor="sort" className="sr-only">
-              Trier les discussions
-            </label>
-            <select
-              id="sort"
-              name="sort"
-              defaultValue={query.sort}
-              className="max-w-full rounded-lg border border-border bg-white px-2 py-[7px] text-xs"
-            >
-              <option value="newest">Plus récentes</option>
-              <option value="oldest">Plus anciennes</option>
-            </select>
-            <Button variant="secondary" type="submit">
-              Trier
-            </Button>
-          </form>
-        </div>
+      <div className="flex min-w-0 flex-col gap-[18px]">
+        {session.member && !category ? (
+          <h1 className="font-serif text-[26px] font-bold tracking-[-.01em] wrap-anywhere">
+            Bonjour {session.member.username}
+          </h1>
+        ) : (
+          <CommunityHero
+            category={category}
+            discussionCount={feed.meta.pagination.total}
+            categoryCount={categories.length}
+          />
+        )}
+        <QuickComposer
+          username={session.member?.username}
+          category={category?.documentId}
+        />
+        <CategoryScroller categories={categories} query={query} />
+        <FeedControls query={query} />
         {feed.data.length ? (
           <section
-            className="divide-y divide-border overflow-hidden rounded-[14px] border border-black/7 bg-white shadow-sm"
+            className="divide-y divide-border overflow-hidden rounded-[14px] border border-hairline bg-surface shadow-card"
             aria-label="Discussions"
           >
+            {query.view === "compact" && (
+              <div className="grid grid-cols-[minmax(0,1fr)_62px_80px] gap-2.5 bg-surface-muted px-3.5 py-2.5 text-xs font-semibold text-muted md:grid-cols-[minmax(0,1fr)_72px_100px] md:gap-4 md:px-[18px]">
+                <span>Discussion</span>
+                <span className="text-center">Réponses</span>
+                <span className="text-right">Publication</span>
+              </div>
+            )}
             {feed.data.map((discussion) => (
               <DiscussionCard
                 key={discussion.documentId}
                 discussion={discussion}
+                compact={query.view === "compact"}
               />
             ))}
           </section>
@@ -123,7 +121,13 @@ export default async function Home({
           href={(page) => feedHref({ ...query, page })}
         />
       </div>
-      <CommunitySidebar />
+      <CommunitySidebar
+        isMember={Boolean(session.member)}
+        question={feed.data.find(
+          (discussion) =>
+            discussion.type === "question" && discussion.replyCount === 0,
+        )}
+      />
     </PageContainer>
   );
 }

@@ -1,16 +1,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PageContainer from "@/components/layout/page-container";
-import { Byline } from "@/components/forum/byline";
-import { CategoryTag } from "@/components/forum/category-tag";
+import CategoryNav from "@/components/forum/category-nav";
+import { Byline, Avatar } from "@/components/forum/byline";
+import {
+  CategoryTag,
+  CategoryIcon,
+  DiscussionType,
+} from "@/components/forum/category-tag";
 import ReplyList from "@/components/forum/reply-list";
+import CopyLink from "@/components/forum/copy-link";
 import { ButtonLink, buttonClassName } from "@/components/ui/button";
 import Card from "@/components/ui/card";
+import Icon from "@/components/ui/icon";
 import { Notice, ServiceError } from "@/components/ui/notice";
-import { getDiscussionThread } from "@/lib/forum/api";
+import { getCategories, getDiscussionThread } from "@/lib/forum/api";
 import {
   discussionHref,
+  feedHref,
   loginHref,
+  newDiscussionHref,
   readPage,
   type SearchParams,
 } from "@/lib/forum/query";
@@ -19,7 +28,6 @@ import { StrapiError } from "@/lib/strapi";
 import ReplyForm from "./reply-form";
 
 export const metadata = { title: "Discussion — Communauté Le Revenu" };
-
 export default async function DiscussionPage({
   params,
   searchParams,
@@ -45,11 +53,12 @@ export default async function DiscussionPage({
         </Notice>
       </PageContainer>
     );
-  let thread, session;
+  let thread, session, categories;
   try {
-    [thread, session] = await Promise.all([
+    [thread, session, categories] = await Promise.all([
       getDiscussionThread(documentId, requestedPage),
       getSession(),
+      getCategories(),
     ]);
   } catch (error) {
     if (!(error instanceof StrapiError)) throw error;
@@ -61,47 +70,82 @@ export default async function DiscussionPage({
     );
   }
   const { discussion, replies } = thread;
+  const category = categories.find(
+    (item) => item.documentId === discussion.category?.documentId,
+  );
+  const participants = new Map(
+    [discussion.author, ...replies.data.map((reply) => reply.author)]
+      .filter((author) => author !== null)
+      .map((author) => [author.documentId, author]),
+  );
   return (
     <PageContainer
       width="discussion"
-      className="grid items-start gap-[30px] md:grid-cols-[minmax(0,1fr)_270px]"
+      className="grid items-start gap-[18px] md:grid-cols-[200px_minmax(0,1fr)] md:gap-7 wide:grid-cols-[212px_minmax(0,1fr)_304px]"
     >
-      <div className="min-w-0 space-y-5">
-        <Link
-          href="/"
-          className="mb-5 inline-block text-[13px] text-muted hover:text-brand-text"
+      <CategoryNav
+        categories={categories}
+        query={{ page: 1, sort: "newest", category: category?.slug }}
+      />
+      <div className="flex min-w-0 flex-col gap-[18px]">
+        <nav
+          aria-label="Fil d’Ariane"
+          className="flex flex-wrap items-center gap-1.5 text-[13.5px] text-muted"
         >
-          ← Toutes les discussions
-        </Link>
-        <Card as="article" className="md:p-8">
-          <div className="flex flex-wrap items-center gap-[9px]">
+          <Link href="/" className="hover:text-foreground">
+            Accueil
+          </Link>
+          {category && (
+            <>
+              <Icon name="chevron" className="size-3.5" />
+              <Link
+                className="hover:text-foreground"
+                href={feedHref({ category: category.slug })}
+              >
+                {category.name}
+              </Link>
+            </>
+          )}
+        </nav>
+        <Card as="article" padding="none" className="p-4 md:px-[22px] md:py-5">
+          <div className="mb-[5px] flex flex-wrap items-center gap-2">
             <CategoryTag category={discussion.category} />
-            <span className="rounded bg-surface-muted px-[7px] py-0.5 text-[10px] font-semibold">
-              {discussion.type === "question" ? "Question" : "Discussion"}
-            </span>
+            <DiscussionType type={discussion.type} />
           </div>
-          <h1 className="mt-4 font-serif text-3xl leading-tight font-bold wrap-anywhere sm:text-4xl">
+          <h1 className="mt-1.5 mb-3.5 font-serif text-2xl leading-[1.2] font-bold tracking-[-.01em] wrap-anywhere md:text-[29px]">
             {discussion.title}
           </h1>
-          <Byline author={discussion.author} createdAt={discussion.createdAt} />
-          <p className="mt-7 leading-[1.85] whitespace-pre-wrap wrap-anywhere">
+          <Byline
+            author={discussion.author}
+            createdAt={discussion.createdAt}
+            variant="post"
+          />
+          <p className="mt-3.5 max-w-[66ch] text-base leading-[1.7] whitespace-pre-wrap wrap-anywhere">
             {discussion.content}
           </p>
-          <a className={buttonClassName("secondary", "mt-7")} href="#replies">
-            Répondre à cette discussion
-          </a>
+          <div className="mt-4 flex flex-wrap items-center gap-1">
+            <a className={buttonClassName("quiet")} href="#replies">
+              <Icon name="msg" />
+              Répondre
+            </a>
+            <CopyLink />
+          </div>
         </Card>
         <section
           id="replies"
-          className="space-y-4"
+          className="space-y-3"
           aria-labelledby="replies-title"
         >
-          <h2 id="replies-title" className="font-serif text-2xl font-bold">
-            {replies.meta.pagination.total}{" "}
-            {replies.meta.pagination.total === 1 ? "réponse" : "réponses"}
+          <h2
+            id="replies-title"
+            className="font-serif text-[21px] font-bold tracking-[-.01em]"
+          >
+            {replies.meta.pagination.total
+              ? `${replies.meta.pagination.total} ${replies.meta.pagination.total === 1 ? "réponse" : "réponses"}`
+              : "Aucune réponse pour l’instant"}
           </h2>
           <ReplyList documentId={documentId} replies={replies} />
-          <Card>
+          <Card padding="none">
             {session.member ? (
               <ReplyForm
                 key={replies.meta.pagination.total}
@@ -109,18 +153,17 @@ export default async function DiscussionPage({
                 username={session.member.username}
               />
             ) : (
-              <div className="py-2.5 text-center">
-                <h3 className="font-serif text-xl font-bold">
-                  Vous avez une expérience à partager ?
+              <div className="flex flex-col items-center gap-2.5 px-5 py-[26px] text-center">
+                <h3 className="font-serif text-[19px] font-bold tracking-[-.01em]">
+                  Vous avez un avis ou une expérience à partager ?
                 </h3>
-                <p className="mt-3 text-muted">
+                <p className="text-muted">
                   {session.unavailable
                     ? "Le service de connexion est indisponible. Réessayez dans quelques instants."
-                    : "Connectez-vous pour prendre part à la conversation."}
+                    : "Rejoignez la communauté pour participer à la conversation."}
                 </p>
                 {!session.unavailable && (
                   <ButtonLink
-                    className="mt-5"
                     href={loginHref(`${discussionHref(documentId)}#replies`)}
                   >
                     Se connecter pour répondre
@@ -131,28 +174,62 @@ export default async function DiscussionPage({
           </Card>
         </section>
       </div>
-      <aside className="hidden pt-10 md:sticky md:top-[100px] md:block">
+      <aside className="flex flex-col gap-[18px] md:col-start-2 wide:col-start-auto">
         <Card>
-          <p className="text-[10px] font-bold tracking-widest text-brand-text">
-            LA COMMUNAUTÉ
+          <h2 className="mb-3 text-[13px] font-semibold">Cette discussion</h2>
+          <dl className="grid grid-cols-2 gap-x-2.5 gap-y-3">
+            <div>
+              <dt className="text-xs text-muted">Réponses</dt>
+              <dd className="text-base font-semibold tabular-nums">
+                {replies.meta.pagination.total}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">Publication</dt>
+              <dd className="text-[13.5px] font-semibold">
+                <time dateTime={discussion.createdAt}>
+                  {new Intl.DateTimeFormat("fr-FR", {
+                    dateStyle: "medium",
+                    timeZone: "Europe/Paris",
+                  }).format(new Date(discussion.createdAt))}
+                </time>
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-3.5 text-xs text-muted">
+            Participants de cette page
           </p>
-          <h2 className="mt-3 font-serif text-xl font-bold">
-            Chaque expérience compte.
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-muted">
-            Posez votre propre question ou explorez les échanges des autres
-            lecteurs.
-          </p>
-          <ButtonLink href="/discussions/nouvelle" className="mt-5 w-full">
-            Lancer une discussion
-          </ButtonLink>
-          <Link
-            href="/"
-            className="mt-4 block text-center text-sm font-semibold underline underline-offset-4"
-          >
-            Voir tous les espaces
-          </Link>
+          <div className="mt-1.5 flex -space-x-1.5">
+            {[...participants.values()].slice(0, 8).map((author) => (
+              <span
+                key={author.documentId}
+                title={author.username}
+                className="rounded-full border-2 border-surface"
+              >
+                <Avatar name={author.username} size="sm" />
+              </span>
+            ))}
+          </div>
         </Card>
+        {category && (
+          <Card>
+            <h2 className="flex items-center gap-2 font-serif text-lg font-bold">
+              <CategoryIcon category={category} />
+              {category.name}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-secondary">
+              {category.description}
+            </p>
+            <ButtonLink
+              variant="secondary"
+              className="mt-3"
+              href={newDiscussionHref({ category: category.documentId })}
+            >
+              <Icon name="plus" />
+              Publier dans cet espace
+            </ButtonLink>
+          </Card>
+        )}
       </aside>
     </PageContainer>
   );

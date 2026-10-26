@@ -1,4 +1,30 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "../styles/theme.css";
+
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
 
 @font-face {
   font-family: "Playfair Display";
@@ -8,25 +34,41 @@
   font-display: swap;
 }
 
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --color-secondary: var(--ink-2);
+  --color-muted: var(--ink-3);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-2);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-text: var(--brand-text);
+  --color-brand-soft: var(--brand-soft);
+  --color-border: var(--line);
+  --color-border-strong: var(--line-strong);
+  --color-hairline: var(--hairline);
+  --color-fill: var(--fill);
+  --color-fill-strong: var(--fill-2);
+  --color-glass: var(--glass);
+  --color-warning: var(--warn);
+  --color-warning-soft: var(--warn-soft);
+  --color-success: var(--ok);
+  --shadow-card: var(--panel-shadow);
+  --shadow-floating: var(--floating-shadow);
+  --font-sans: var(--f-body);
+  --font-serif: var(--f-display);
+}
 @theme {
-  --color-background: #f5f5f7;
-  --color-foreground: #1d1d1f;
-  --color-brand: #eb0f0f;
-  --color-brand-hover: #cc0d0d;
-  --color-brand-text: #c90909;
-  --color-border: #e5e5ea;
-  --color-muted: #626268;
-  --color-surface-muted: #f2f2f4;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
-  --breakpoint-wide: 68.75rem;
+  --breakpoint-md: 47.5625rem;
+  --breakpoint-wide: 73.8125rem;
 }
 
 @layer base {
   body {
-    background: var(--color-background);
-    color: var(--color-foreground);
-    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--f-body);
     font-size: 15px;
     line-height: 1.5;
   }
@@ -43,10 +85,29 @@
     -webkit-tap-highlight-color: transparent;
   }
   :focus-visible {
-    outline: 3px solid var(--color-brand-text);
-    outline-offset: 4px;
+    outline: 3px solid color-mix(in srgb, var(--brand) 45%, transparent);
+    outline-offset: 2px;
   }
   [id] {
     scroll-margin-top: 110px;
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--brand) 22%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 }

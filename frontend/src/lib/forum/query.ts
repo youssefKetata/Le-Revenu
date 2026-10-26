@@ -5,6 +5,7 @@ export type FeedQuery = {
   category?: string;
   sort: "newest" | "oldest";
   page: number;
+  view?: "compact";
 };
 
 export function readPage(value: SearchParams[string]): number | null {
@@ -28,8 +29,10 @@ export function readFeedQuery(params: SearchParams): FeedQuery | null {
   const page = readPage(params.page);
   const sort = params.sort ?? "newest";
   const category = params.category;
+  const view = params.view;
   if (
     !page ||
+    (view !== undefined && view !== "compact") ||
     (sort !== "newest" && sort !== "oldest") ||
     (category !== undefined &&
       (typeof category !== "string" ||
@@ -37,7 +40,7 @@ export function readFeedQuery(params: SearchParams): FeedQuery | null {
         category.length > 255))
   )
     return null;
-  return { page, sort, category };
+  return { page, sort, category, view };
 }
 
 export function feedHref(query: Partial<FeedQuery> = {}): string {
@@ -45,6 +48,7 @@ export function feedHref(query: Partial<FeedQuery> = {}): string {
   if (query.category) params.set("category", query.category);
   if (query.sort && query.sort !== "newest") params.set("sort", query.sort);
   if (query.page && query.page > 1) params.set("page", String(query.page));
+  if (query.view) params.set("view", query.view);
   return params.size ? `/?${params}` : "/";
 }
 
@@ -53,10 +57,39 @@ export function discussionHref(documentId: string): string {
 }
 
 export function safeReturnTo(value: unknown): string {
-  return typeof value === "string" &&
+  if (typeof value !== "string") return "/";
+  if (
     /^\/(?:discussions\/(?:nouvelle|[a-z0-9]{24})(?:#replies)?)?$/.test(value)
-    ? value
-    : "/";
+  )
+    return value;
+  if (!value.startsWith("/discussions/nouvelle?")) return "/";
+  const params = new URLSearchParams(
+    value.slice("/discussions/nouvelle?".length),
+  );
+  const type = params.get("type"),
+    category = params.get("category");
+  if (
+    [...params.keys()].some((key) => key !== "type" && key !== "category") ||
+    params.getAll("type").length > 1 ||
+    params.getAll("category").length > 1 ||
+    (type !== null && type !== "question" && type !== "discussion") ||
+    (category !== null && !/^[a-z0-9]{24}$/.test(category))
+  )
+    return "/";
+  return newDiscussionHref({
+    type: type ?? undefined,
+    category: category ?? undefined,
+  });
+}
+
+export function newDiscussionHref({
+  type,
+  category,
+}: { type?: "question" | "discussion"; category?: string } = {}) {
+  const params = new URLSearchParams();
+  if (type) params.set("type", type);
+  if (category) params.set("category", category);
+  return `/discussions/nouvelle${params.size ? `?${params}` : ""}`;
 }
 
 export function loginHref(returnTo: string): string {

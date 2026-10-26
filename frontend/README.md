@@ -12,7 +12,7 @@ npm run dev:frontend
 
 The application uses the server-side `STRAPI_URL` environment variable to reach Strapi. It has no database connection or PostgreSQL dependency.
 
-`/` renders the live community feed, category filters, date sorting and pagination. `/discussions/[documentId]` renders a discussion and its paginated replies. `/discussions/nouvelle` provides the authenticated publishing form. Data fetching and session checks stay in Server Components; the forms use Client Components with Server Actions and pending/error feedback.
+`/` renders the live community feed, category filters, date sorting, detailed/compact views and pagination. `/espaces` lists real categories; `/charte` presents community guidelines. `/discussions/[documentId]` renders a discussion and its paginated replies. `/discussions/nouvelle` provides the authenticated publishing form. Data fetching and session checks stay in Server Components; the forms use Client Components with Server Actions and pending/error feedback.
 
 `/connexion` provides demo-member login through a Server Action and native Strapi authentication. `src/lib/session.ts` stores the ten-minute access token in an HttpOnly cookie and verifies the member through Strapi's current-user endpoint. The shared header displays login/logout controls. Login returns to an allowlisted local forum destination.
 
@@ -24,18 +24,25 @@ The cookie uses `SameSite=Lax`, a host-only scope and `Secure` in production. Lo
 
 ```text
 src/app/                 Routes, Server Actions and route-specific interactive forms
-src/components/layout/  Shared header and page container
+src/components/layout/  Header, account/mobile navigation, page container and route dialogs
 src/components/ui/      Shared buttons, cards, fields and notices
 src/components/forum/   Forum navigation, discussion cards, bylines and reply lists
 src/lib/forum/          Typed API reads, public types and URL helpers
 src/lib/session.ts      Server-only member cookie and identity checks
 src/lib/strapi.ts       Server-only HTTP transport
+src/styles/theme.css   Shared light/dark design tokens
 ```
 
-Use Tailwind utilities for ordinary component styling. `app/globals.css` contains only font loading, shared theme tokens and base element rules. The hero's layered background is a small colocated CSS Module; its layout and responsive styling remain in the component. Buttons and form controls use shared components/styles so screens do not drift apart. These conventions also live in `AGENTS.md` for future changes.
+Use Tailwind utilities for ordinary component styling. `styles/theme.css` holds the v2 light/dark palette; `app/globals.css` contains font loading, Tailwind aliases, the `tw-animate-css` import and base element rules. Small colocated CSS Modules handle the hero/button gradients. The Tailwind loader applies only to `globals.css`, preserving native CSS Module exports. Buttons and form controls use shared components/styles so screens do not drift apart. These conventions also live in `AGENTS.md` for future changes.
+
+The current visual reference is `maquette-communaute-le-revenu-v2.html`, within the assignment's feature scope. Colors follow the system light/dark preference. Login and publishing use the shared shadcn/ui Radix Dialog through Next.js intercepting/parallel routes on client navigation; direct URLs and reloads render standalone pages. The backdrop fades over 150ms and the panel fades, rises 12px and scales from 95% over 200ms. Escape, close and backdrop dismissal finish the exit animation before returning through browser history. Reduced-motion preferences disable the animations. Radix manages focus containment, outside interaction and scroll locking; a successful form redirect does not navigate backward. New-publication links can preselect the required type/category; the login return destination remains allowlisted. Component attribution is recorded in `THIRD_PARTY_NOTICES.md`.
+
+All product dropdowns use shared shadcn/ui components: Dropdown Menu for account actions and Select for the publishing category. The Select trigger reuses the existing input dimensions, theme and focus ring; its popup provides keyboard navigation, typeahead, a selected-item indicator and viewport-aware positioning. The category remains required and submits through the existing Server Action. Account logout remains a form action with pending feedback.
 
 Pages compose components and fetch data; the forum components do not fetch or mutate data. Normal discussion requests load the discussion and replies in parallel. Opening the final reply page first obtains the reply count, then fetches the appropriate bounded page. Expected Strapi errors get service feedback; unexpected exceptions reach the route error boundary.
 
-The forms keep text in memory after errors, with a separate login tab offered on expired sessions; reloads do not preserve drafts. Playfair Display is bundled locally with its Open Font License, so builds have no font-network dependency.
+Login, publishing and reply forms use custom validation with `noValidate`, without browser constraint popups or native length caps. Shared validators check trimmed text limits and the login password's UTF-8 byte limit. The shared hook validates on submit, focuses the first invalid control and revalidates edited fields after submission. `FormField` renders client and field-specific server errors as small red text beneath each control with accessible descriptions; authentication/service failures retain form-level feedback. Submission reads the real form values, including browser autofill. Strapi still enforces publishing rules independently.
 
-Run `npm run test:frontend` from the root with seeded Strapi and Next.js servers running. Two read-only scenarios cover feed/detail rendering, URL filters/order, metadata, empty/invalid/missing states and anonymous publishing navigation. The local HTTP form journey also passed login, validation, create, reply, reload and logout; its temporary records were removed. Browser visual/hydration checks remain pending. See the root README for all verification commands.
+The forms keep text in memory after errors, with a separate login tab offered on expired sessions; reloads or closing the form do not preserve drafts. Ctrl/Cmd+Enter uses the same custom validation as the submit button. Playfair Display and Inter are bundled locally with their Open Font Licenses, so builds have no font-network dependency.
+
+Run `npm run test:frontend` from the root with seeded Strapi and Next.js servers running. Two read-only scenarios cover feed/detail rendering and excerpts, URL filters/order/views, category/charter pages, metadata, empty/invalid/missing states and anonymous publishing navigation. The local HTTP form journey also passed login, validation, create, reply, reload and logout; its temporary records were removed. Desktop/mobile browser checks cover the rendered design, native login, publishing dialog and navigation. See the root README for verification details and limits.
