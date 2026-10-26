@@ -6,6 +6,7 @@
     "node": "24.x"
   },
   "scripts": {
+    "demo": "node scripts/demo.mjs",
     "setup:env": "node scripts/setup-env.mjs",
     "seed:demo": "node scripts/seed-demo.mjs",
     "test:api": "node --test --test-concurrency=1 scripts/forum-api.test.mjs",

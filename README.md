@@ -12,6 +12,7 @@ backend/                  Strapi v5 application and database configuration
 scripts/setup-env.mjs     Creates local environment files and random secrets
 scripts/check-database.mjs Verifies the configured application database connection
 scripts/seed-demo.mjs     Loads Strapi and runs its demo seed
+scripts/demo.mjs          Installs dependencies, seeds and starts both applications
 ```
 
 Next.js communicates with Strapi over HTTP. Strapi owns all content, business rules and database access. The database-check script is a developer diagnostic, outside the Next.js application.
@@ -19,22 +20,38 @@ Next.js communicates with Strapi over HTTP. Strapi owns all content, business ru
 ## Prerequisites
 
 - Node.js 24 LTS and npm.
-- A running PostgreSQL server. This machine uses the existing PostgreSQL 18.1 Windows service on port 5432.
-- PostgreSQL administrator access for the initial creation of a dedicated database and restricted application role.
+- A running PostgreSQL server (verified with PostgreSQL 18.1).
+- An empty PostgreSQL database and a user that owns it, configured in `backend/.env`. Administrator access is needed only if you must create that database/user first.
 
-No Docker, separate database server, cloud account, Redis or additional runtime is required.
+No Docker, Redis or cloud account is required; the applications use your PostgreSQL installation.
 
 ## Installation on a fresh checkout
 
 Run from the repository root:
 
+In Windows PowerShell, use `npm.cmd` wherever these examples show `npm`.
+
 ```powershell
-npm --prefix frontend ci
-npm --prefix backend ci
 npm run setup:env
 ```
 
-`setup:env` copies the committed environment examples and generates random local passwords and signing secrets. It preserves existing `.env` files and never prints secret values. Real environment files are ignored by Git.
+This creates `backend/.env` and `frontend/.env` from the examples, generates signing secrets and a local database password, and keeps the public demo-member passwords listed below. Existing environment files are preserved. Real environment files are ignored by Git.
+
+Edit the PostgreSQL connection settings in `backend/.env` to match your database. The defaults use database/user `le_revenu` on `127.0.0.1:5432`; set `DATABASE_PASSWORD` to that user's actual password. Keep `DATABASE_SCHEMA=public` for the normal installation. If needed, create the database/user using the instructions below.
+
+Then start the complete demo with one command:
+
+```powershell
+npm run demo
+```
+
+No root `npm install` is needed. This command installs both applications from their lockfiles using `npm ci --no-audit --no-fund`, checks the database connection, initializes Strapi's tables and demo data, and starts Strapi and Next.js in development mode. The first dependency installation may take several minutes. It waits for both applications to respond before printing `Demo ready: http://localhost:3000`. Open that URL and log in with either [demo member](#demo-data) below. Strapi admin is at `http://127.0.0.1:1337/admin`.
+
+Keep this terminal open; Ctrl+C stops both applications and their child processes. PostgreSQL remains running. Rerunning the command reinstalls dependencies and fills in missing demo records while preserving existing content and passwords. It refuses to start if either configured application port is occupied. A failed startup stops the other application and prints the failing step.
+
+For different local ports, update backend `PORT`, `FRONTEND_URL`, and frontend `STRAPI_URL` together. For example, `PORT=1437`, `FRONTEND_URL=http://localhost:3100`, and `STRAPI_URL=http://127.0.0.1:1437`. The demo command uses those values. `DATABASE_SCHEMA` optionally selects an existing PostgreSQL schema; the default is `public`.
+
+### Creating the PostgreSQL database/user, if needed
 
 Create an application role and database in your existing PostgreSQL installation. For example, open SQL Shell / psql as the local PostgreSQL administrator:
 
@@ -55,7 +72,7 @@ At the password prompt, use the generated `DATABASE_PASSWORD` from `backend/.env
 
 For an existing project database, skip creation and update `backend/.env` with its connection settings. The script does not reset passwords or modify existing databases.
 
-Verify connectivity after installing backend dependencies:
+The demo command checks connectivity automatically. After dependencies have been installed, you can also check it independently:
 
 ```powershell
 npm run db:check
@@ -65,7 +82,7 @@ The output includes the database name, application role and PostgreSQL version, 
 
 ## Development
 
-Ensure your existing PostgreSQL service is running. On this machine, `le_revenu` and its restricted role have already been created; no database initialization command is needed on subsequent runs.
+`npm run demo` is the recommended first-run path. After installation and seeding, you can also start the applications separately to avoid reinstalling dependencies during development. Ensure PostgreSQL is running first.
 
 Open two terminals in the repository root.
 
@@ -94,23 +111,22 @@ Stop application processes with Ctrl+C. Your existing PostgreSQL Windows service
 
 ## Demo data
 
-After database setup, stop any running backend process and run from the repository root:
+`npm run demo` seeds automatically. To reseed an installed checkout independently, stop the backend and run from the repository root:
 
 ```powershell
-npm run setup:env
 npm run seed:demo
 ```
 
-The seed compiles the backend TypeScript, loads Strapi and writes through its native user service and Document Service API. It does not start an HTTP server or build the admin UI. Seeding is explicit; normal application startup does not run it.
+The seed compiles the backend TypeScript, loads Strapi and writes through its native user service and Document Service API. It does not start an HTTP server or build the admin UI. Individual `dev`/`start` commands do not seed; `npm run demo` invokes this step before starting either server.
 
 It creates two confirmed members with the Authenticated role, four French categories (Bourse, Immobilier, Épargne and Fiscalité), five discussions and five replies. The final discussion has no replies. Sample text is fictional and contains no real member information.
 
-| Username | Email | Password in local `backend/.env` |
+| Username | Email | Default demo password |
 | --- | --- | --- |
-| `camille_demo` | `camille.demo@example.test` | `DEMO_CAMILLE_PASSWORD` |
-| `thomas_demo` | `thomas.demo@example.test` | `DEMO_THOMAS_PASSWORD` |
+| `camille_demo` | `camille.demo@example.test` | `CamilleDemo2026!` |
+| `thomas_demo` | `thomas.demo@example.test` | `ThomasDemo2026!` |
 
-Passwords are generated by `setup:env`, hashed by Strapi when accounts are created, and never logged by the seed. You can set your own values before the first seed (at least 12 characters and at most 72 UTF-8 bytes). These are forum accounts, not dashboard administrators. Use them on `/connexion` once both applications are running.
+These are public credentials for fictional local demo members, not database or dashboard administrator credentials. They match `DEMO_CAMILLE_PASSWORD` and `DEMO_THOMAS_PASSWORD` in a newly generated `backend/.env`. Strapi hashes them when creating the accounts. You can override them before the first seed (at least 12 characters and at most 72 UTF-8 bytes); use your configured values if you do. Existing databases keep their original passwords when the seed is rerun. Use the accounts on `/connexion` once both applications are running.
 
 The seed creates missing records and keeps existing ones, including edited content, relations, roles and password hashes. Stable document IDs are the only seed identifiers, including after titles, usernames or slugs change. Username/email collisions with a different user cause an error; category slug collisions are rejected by the schema. All seed writes run in one transaction and roll back together on failure.
 
@@ -207,6 +223,8 @@ Votes use a native Strapi many-to-many relation; best answers use a single optio
 Next.js Server Actions forward only the intended state. With JavaScript, votes use React `useOptimistic`: the button state and count update immediately, stay pending during the request, and reconcile with fresh Strapi data without navigation or moving focus. Failed requests roll back to the confirmed state and show feedback; expired sessions offer reconnection. A per-reply guard blocks duplicate submissions while saving. Without JavaScript, the same vote form uses the native Server Action and redirects to the reply after success. Best-answer changes revalidate the feed/thread and redirect to the same reply page's reply section. Reloads read persisted counts and selections. The integration suite covers duplicate/concurrent votes, independent member votes, removal, invalid and cross-question input, replacement/clearing, public field privacy and revoked/underprivileged sessions.
 
 ## Checks and production-mode startup
+
+The one-command demo was verified on Windows from a clean source copy with no installed dependencies or build output, using an empty, separate PostgreSQL schema on the existing service. The check confirmed the initial 2 members / 4 categories / 5 discussions / 5 replies; both README logins through Next.js; question/reply creation; voting; best-answer selection; reload; and all three frontend rendering scenarios. Reseeding preserved the additional contributions, vote and selected answer. Ctrl+C stopped both test servers, and the disposable schema was removed without changing the original forum data. Custom ports 3100/1437 were used to keep the existing demo running.
 
 Run checks and builds sequentially on an 8 GB machine:
 

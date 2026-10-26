@@ -16,6 +16,7 @@ const config = ({ env }: Core.Config.Shared.ConfigParams): Core.Config.Database 
         host: env('DATABASE_HOST', '127.0.0.1'),
         port: env.int('DATABASE_PORT', 5432),
         database: env('DATABASE_NAME', 'le_revenu'),
+        schema: env('DATABASE_SCHEMA', 'public'),
         user: env('DATABASE_USERNAME', 'le_revenu'),
         password,
         ssl: env.bool('DATABASE_SSL', false) && { rejectUnauthorized: true },

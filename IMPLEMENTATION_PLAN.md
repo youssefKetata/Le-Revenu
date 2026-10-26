@@ -168,7 +168,7 @@ HTTP journey gate passed against real PostgreSQL data, including native validati
 - Refine the supplied design across desktop and mobile, including keyboard behavior. V2 layout, theme, cards, compact feed, mobile navigation, spaces/charter pages and shadcn/ui route dialogs are implemented within the existing feature scope. Feed excerpts use one bounded batched Strapi projection; no schema or compatibility layer is added.
 - Review permissions, safe response fields and invalid session behavior.
 - Run automated tests, type checks, lint checks and production builds sequentially.
-- Verify startup and seeding against a fresh dedicated database using only README instructions.
+- Fresh-install verification passed from a clean source copy with no dependencies/build artifacts, using an empty isolated PostgreSQL schema. `npm run demo` installs locked dependencies, checks PostgreSQL, seeds and starts both apps. Both documented member logins, native publishing, votes, best-answer selection, reload, frontend checks, non-destructive reseeding and Ctrl+C cleanup passed. Existing forum data was preserved.
 - Finish architecture notes, demo-account setup, API/test commands and known limitations.
 
 Completion gate: a reviewer can reproduce the project locally from the repository and follow the main user journey.
