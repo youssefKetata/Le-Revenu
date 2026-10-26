@@ -11,9 +11,11 @@ const populate = {
 
 type SummaryRow = Data.ContentType<'api::discussion.discussion', 'title' | 'type' | 'createdAt' | 'author' | 'category'> & { replies?: unknown };
 
-function summary(row: SummaryRow) {
+function excerpt(content: string) { return content.slice(0, 220).replace(/[\uD800-\uDBFF]$/, '').replace(/\s+/g, ' ').trim(); }
+
+function summary(row: SummaryRow, preview: string) {
   return {
-    documentId: row.documentId, title: row.title, type: row.type, createdAt: row.createdAt,
+    documentId: row.documentId, title: row.title, excerpt: preview, type: row.type, createdAt: row.createdAt,
     author: row.author ? { documentId: row.author.documentId, username: row.author.username } : null,
     category: row.category ? {
       documentId: row.category.documentId, name: row.category.name, slug: row.category.slug,
@@ -36,7 +38,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         fields: ['title', 'content', 'type', 'createdAt'],
         populate,
       });
-      return { data: { ...summary(row), content: row.content }, meta: {} };
+      return { data: { ...summary(row, excerpt(row.content!)), content: row.content }, meta: {} };
     });
   },
   async findPage(page: FeedQuery) {
@@ -53,7 +55,19 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       }),
       documents.count({ filters }),
     ]);
-    return { data: rows.map(summary), meta: { pagination: pageMeta(page, total) } };
+    // Project bounded previews in one query; do not transfer full text bodies for a feed.
+    const db = strapi.db.connection;
+    const { tableName, attributes } = strapi.db.metadata.get('api::discussion.discussion');
+    const idField = attributes.documentId, contentField = attributes.content;
+    if (!('columnName' in idField) || !idField.columnName || !('columnName' in contentField) || !contentField.columnName) {
+      throw new Error('Discussion scalar column metadata is missing.');
+    }
+    const previews: { documentId: string; excerpt: string }[] = rows.length ? await strapi.db.getConnection(tableName)
+      .select({ documentId: idField.columnName })
+      .select({ excerpt: db.raw('left(??, ?)', [contentField.columnName, 220]) })
+      .whereIn(idField.columnName, rows.map(row => row.documentId)) : [];
+    const byId = new Map(previews.map(row => [row.documentId, excerpt(row.excerpt)]));
+    return { data: rows.map(row => summary(row, byId.get(row.documentId) ?? '')), meta: { pagination: pageMeta(page, total) } };
   },
   async findDetail(documentId: string) {
     const row = await strapi.documents('api::discussion.discussion').findOne({
@@ -62,6 +76,6 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       populate,
     });
     if (!row) throw new errors.NotFoundError('Discussion not found.');
-    return { data: { ...summary(row), content: row.content }, meta: {} };
+    return { data: { ...summary(row, excerpt(row.content!)), content: row.content }, meta: {} };
   },
 });

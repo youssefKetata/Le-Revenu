@@ -11,6 +11,7 @@ export type Category = {
 export type DiscussionSummary = {
   documentId: string;
   title: string;
+  excerpt: string;
   type: "question" | "discussion";
   createdAt: string;
   author: Author | null;

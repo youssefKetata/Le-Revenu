@@ -97,6 +97,9 @@ test('forum integration', { timeout: 90_000 }, async t => {
       for (const row of full.body.data) {
         assert.deepEqual(Object.keys(row.author).sort(), ['documentId', 'username']);
         assert.equal('replies' in row || 'content' in row, false);
+        assert.equal(typeof row.excerpt, 'string');
+        assert.ok(row.excerpt.length <= 220);
+        assert.ok(fixtures.demoDiscussions.find(item => item.documentId === row.documentId).content.replace(/\s+/g, ' ').startsWith(row.excerpt));
       }
       const filtered = await request('/api/discussions?category=bourse&sort=oldest&pageSize=1&page=2');
       assert.deepEqual(filtered.body.meta.pagination, { page: 2, pageSize: 1, pageCount: 2, total: 2 });
