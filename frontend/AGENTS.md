@@ -20,5 +20,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Pages orchestrate server reads. Client Components are limited to interaction. Server Actions forward intended fields with the member token; business validation, authorship and persistence stay in Strapi.
 - Handle expected service failures explicitly and let unexpected errors reach the error boundary. Preserve uncached reads, bounded pagination, request-scoped identity checks and the agreed ten-minute sessions.
 - Keep tests focused on observable behavior. Rendering checks must not depend on CSS class names.
-- Use `maquette-communaute-le-revenu-v2.html` as the current visual reference within the assignment's existing feature scope. Do not add simulated metrics, controls or unsupported features.
 - Login and publishing use intercepted route dialogs on client navigation and standalone pages on direct navigation. Keep both paths working. Use the shared shadcn/ui Radix Dialog with `tw-animate-css`; route dismissal must wait for its exit animation and respect reduced motion. Apply the Tailwind loader only to `globals.css`; CSS Modules use Next.js's native processing.
