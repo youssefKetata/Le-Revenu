@@ -112,6 +112,29 @@ test('forum integration', { timeout: 90_000 }, async t => {
     });
 
     await t.test('search matches titles and content literally with category, sorting and pagination', async () => {
+      const { configureSearchIndexes } = require(resolve(context.distDir, 'src/search/indexes.js'));
+      // Re-running setup and Strapi schema synchronization must preserve the indexes.
+      await configureSearchIndexes(app);
+      await app.db.schema.syncSchema();
+      const queries = [];
+      const collect = query => {
+        if (/select.*from.*"discussions"/is.test(query.sql) && /like lower/i.test(query.sql)) queries.push(query);
+      };
+      app.db.connection.on('query', collect);
+      try { assert.equal((await request('/api/discussions?q=PDF')).status, 200); }
+      finally { app.db.connection.removeListener('query', collect); }
+      assert.equal(queries.length, 2, 'Capture the real filtered page and count queries.');
+      await client.query('BEGIN');
+      try {
+        // Tiny fixtures normally favor sequential scans; verify index eligibility only.
+        await client.query('SET LOCAL enable_seqscan = off');
+        for (const query of queries) {
+          const result = await client.query(`EXPLAIN (FORMAT JSON) ${query.sql}`, query.bindings);
+          const plan = JSON.stringify(result.rows[0]['QUERY PLAN']);
+          assert.ok(plan.includes('discussions_title_search_gin'));
+          assert.ok(plan.includes('discussions_content_search_gin'));
+        }
+      } finally { await client.query('ROLLBACK'); }
       for (const q of ['  RAPPORT ANNUEL  ', 'PDF complet']) {
         const result = await request(`/api/discussions?${new URLSearchParams({ q })}`);
         assert.equal(result.status, 200);

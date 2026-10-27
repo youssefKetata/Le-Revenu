@@ -73,6 +73,10 @@ Pages read Strapi REST data in Server Components through the typed `frontend/src
 
 Strapi owns validation, authorship and persistence. Controllers accept only the intended fields; services use the v5 Document Service, and policies enforce active member sessions alongside native Users & Permissions. The frontend stores the access token in a ten-minute HttpOnly, SameSite cookie and forwards it to Strapi. Queries paginate and sort on the backend, populate selected relation fields and batch reply/vote counts. PostgreSQL row locks serialize competing votes and best-answer changes.
 
+Discussion search uses native Strapi case-insensitive substring filters on title/content. After Strapi creates its tables, `backend/src/search/indexes.ts` enables PostgreSQL's `pg_trgm` extension in `public` and creates two GIN expression indexes in the configured application schema. The expressions match Strapi's `LOWER(CAST(column AS VARCHAR))` queries. Setup is repeatable and runs during startup/seeding; existing indexes are kept. The database owner used by the local setup can install this trusted extension. On a managed database, an administrator may need to enable `pg_trgm` in `public` first.
+
+Trigram indexes support substring searches without changing matching behavior. Very short or punctuation-only searches may still scan, and PostgreSQL can choose a sequential scan for a small table. Indexes also consume storage and add write work. API tests verify that the real search and count queries can use both indexes, with sequential scans disabled only inside the test transaction. Index creation runs before serving requests; a future large live database would need a separate concurrent index rollout. See [PostgreSQL's pg_trgm documentation](https://www.postgresql.org/docs/18/pgtrgm.html).
+
 The shared dialogs, selects and menus use Radix primitives adapted from shadcn/ui for keyboard and focus behavior; `tw-animate-css` supplies their transitions. `clsx` and `tailwind-merge` compose Tailwind classes. UI tests use jsdom and esbuild to exercise the voting component without a browser server; API and HTTP rendering tests use Node's built-in test runner.
 
 ## Checks
