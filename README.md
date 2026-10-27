@@ -67,7 +67,17 @@ Next.js calls Strapi over HTTP; Strapi handles authentication, business rules an
 
 For custom ports without Docker, update backend `PORT` and `FRONTEND_URL`, plus frontend `STRAPI_URL`.
 
+## Architecture choices
+
+Pages read Strapi REST data in Server Components through the typed `frontend/src/lib/forum/api.ts` functions and the server-only HTTP transport. Reads use `cache: "no-store"`; successful writes revalidate the affected routes before redirecting or refreshing the current view. Client Components handle forms, dialogs and optimistic voting. Loading, empty and service-error states are rendered explicitly.
+
+Strapi owns validation, authorship and persistence. Controllers accept only the intended fields; services use the v5 Document Service, and policies enforce active member sessions alongside native Users & Permissions. The frontend stores the access token in a ten-minute HttpOnly, SameSite cookie and forwards it to Strapi. Queries paginate and sort on the backend, populate selected relation fields and batch reply/vote counts. PostgreSQL row locks serialize competing votes and best-answer changes.
+
+The shared dialogs, selects and menus use Radix primitives adapted from shadcn/ui for keyboard and focus behavior; `tw-animate-css` supplies their transitions. `clsx` and `tailwind-merge` compose Tailwind classes. UI tests use jsdom and esbuild to exercise the voting component without a browser server; API and HTTP rendering tests use Node's built-in test runner.
+
 ## Checks
+
+These commands require the local Node.js dependencies installed by `npm run demo` (or `npm ci --prefix frontend` and `npm ci --prefix backend`).
 
 ```sh
 npm run lint:frontend
@@ -78,4 +88,4 @@ npm run test:api
 npm run test:frontend
 ```
 
-API tests use an isolated PostgreSQL schema. Frontend HTTP tests require both apps running with demo data. UI tests run without servers.
+API tests use the connection in `backend/.env` and create and remove an isolated PostgreSQL schema; the database user must have permission to create schemas. They start their own Strapi instance on a free port. Frontend HTTP tests require both apps running with demo data; use `TEST_FRONTEND_URL` and `TEST_STRAPI_URL` when testing custom ports. UI tests run without servers.

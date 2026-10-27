@@ -4,7 +4,9 @@ import SiteHeader, {
   HeaderShell,
   SiteBar,
   MobileNavigation,
+  MobileNavigationSkeleton,
 } from "@/components/layout/site-header";
+import Skeleton from "@/components/ui/skeleton";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -30,7 +32,11 @@ export default function RootLayout({
         <Suspense
           fallback={
             <HeaderShell>
-              <span className="ml-auto text-sm text-muted">Chargement…</span>
+              <span role="status" className="sr-only">Chargement du compte…</span>
+              <div aria-hidden="true" className="ml-auto flex items-center gap-2.5">
+                <Skeleton className="h-9 w-24 rounded-[10px]" />
+                <Skeleton className="hidden h-9 w-24 rounded-[10px] min-[861px]:block" />
+              </div>
             </HeaderShell>
           }
         >
@@ -38,7 +44,7 @@ export default function RootLayout({
         </Suspense>
         {children}
         {modal}
-        <Suspense fallback={null}>
+        <Suspense fallback={<MobileNavigationSkeleton />}>
           <MobileNavigation />
         </Suspense>
       </body>

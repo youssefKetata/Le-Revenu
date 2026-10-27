@@ -6,6 +6,7 @@ import AccountMenu from "./account-menu";
 import MobileNav from "./mobile-nav";
 import Icon from "@/components/ui/icon";
 import { Button, ButtonLink } from "@/components/ui/button";
+import Skeleton from "@/components/ui/skeleton";
 
 export function Brand() {
   return (
@@ -162,4 +163,23 @@ export default async function SiteHeader() {
 export async function MobileNavigation() {
   const session = await getSession();
   return <MobileNav signedIn={Boolean(session.member)} />;
+}
+
+export function MobileNavigationSkeleton() {
+  return (
+    <div aria-hidden="true" className="fixed right-0 bottom-0 left-0 z-40 flex items-center justify-around border-t border-hairline bg-glass px-2 pt-1.5 pb-[calc(6px+env(safe-area-inset-bottom,0px))] backdrop-blur-[20px] backdrop-saturate-180 md:hidden">
+      {[0, 1, 2, 3, 4].map((index) => (
+        <div key={index} className="flex min-h-12 min-w-14 flex-col items-center gap-1 px-2 py-1">
+          {index === 2 ? (
+            <Skeleton className="-mt-[18px] size-12 rounded-full" />
+          ) : (
+            <>
+              <Skeleton className="size-5" />
+              <Skeleton className="h-3 w-10" />
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
